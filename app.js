@@ -70,7 +70,7 @@ let history = [];
 let bodyMaterial = new THREE.MeshStandardMaterial({ color: "#e0a165", roughness: .52, metalness: .01 });
 const materialColors = { pla: "#e0a165", petg: "#78a18b", resin: "#8393ad" };
 
-function num(id, fallback) { return Number($(id).value) || fallback; }
+function num(id, fallback) { const el=$(id); return el ? (Number(el.value) || fallback) : fallback; }
 function config() {
   return {
     width: clamp(num("#plate-width",64),25,120),
@@ -393,8 +393,8 @@ document.querySelectorAll("input,select,textarea").forEach(input=>{
   input.addEventListener("input",()=>{
     if(input.id==="stamp-text")$("#text-count").textContent=`${input.value.length} / 40`;
     if(input.id==="pattern-repeat")$("#repeat-value").textContent=input.value;
-    if(input.id==="design-rotation"){ $("#design-rotation-range").value=input.value; $("#rotation-angle-value").textContent=input.value+"°"; }
-    if(input.id==="design-rotation-range"){ $("#design-rotation").value=input.value; $("#rotation-angle-value").textContent=input.value+"°"; scheduleRebuild(); }
+    if(input.id==="design-rotation"){ const range=$("#design-rotation-range"),output=$("#rotation-angle-value"); if(range)range.value=input.value; if(output)output.textContent=input.value+"°"; }
+    if(input.id==="design-rotation-range"){ const degrees=$("#design-rotation"),output=$("#rotation-angle-value"); if(degrees)degrees.value=input.value; if(output)output.textContent=input.value+"°"; scheduleRebuild(); }
     if(input.id==="magnet-count")$("#magnet-count-value").textContent=input.value;
     if(input.id==="hinge-angle"){
       $("#hinge-angle-value").textContent=input.value+"°";
@@ -458,7 +458,7 @@ $("#svg-file").addEventListener("change",async event=>{
 });
 function projectData(){
   return {version:1,name:$("#project-name").value,mechanism,designMode,svgName:sourceSvgName,svgText:sourceSvgText,
-    values:Object.fromEntries(["stamp-text","stamp-font","font-size","design-scale","design-rotation","edge-cap","offset-x","offset-y","mirror-design","plate-width","plate-height","plate-thickness","corner-radius","relief-height","impression-depth","clearance","design-margin","hinge-hole","magnet-size","magnet-depth","magnet-count","hinge-angle","pattern-select","pattern-repeat","material-preset"].map(id=>[id,$("#"+id).type==="checkbox"?$("#"+id).checked:$("#"+id).value]))};
+    values:Object.fromEntries(["stamp-text","stamp-font","font-size","design-scale","design-rotation","edge-cap","offset-x","offset-y","mirror-design","plate-width","plate-height","plate-thickness","corner-radius","relief-height","impression-depth","clearance","design-margin","hinge-hole","magnet-size","magnet-depth","magnet-count","hinge-angle","pattern-select","pattern-repeat","material-preset"].flatMap(id=>{const el=$("#"+id);return el?[[id,el.type==="checkbox"?el.checked:el.value]]:[]}))};
 }
 function applyProject(data){
   if(data.version!==1||!data.values)throw new Error("Unsupported project file.");
@@ -472,8 +472,9 @@ function applyProject(data){
   document.querySelectorAll(".hinge-only").forEach(x=>x.hidden=mechanism!=="hinge");
   document.querySelectorAll(".mode-button").forEach(x=>x.classList.toggle("active",x.dataset.mode===designMode));
   document.querySelectorAll(".design-pane").forEach(x=>x.classList.toggle("active",x.dataset.design===designMode));
-  $("#design-rotation-range").value=$("#design-rotation").value;
-  $("#rotation-angle-value").textContent=$("#design-rotation").value+"°";
+  const rotationRange=$("#design-rotation-range"),rotationOutput=$("#rotation-angle-value");
+  if(rotationRange)rotationRange.value=$("#design-rotation").value;
+  if(rotationOutput)rotationOutput.textContent=$("#design-rotation").value+"°";
   $("#text-count").textContent=`${$("#stamp-text").value.length} / 40`;
   $("#repeat-value").textContent=$("#pattern-repeat").value;
   $("#magnet-count-value").textContent=$("#magnet-count").value;
@@ -493,8 +494,9 @@ $("#load-project").addEventListener("change",async event=>{
 $("#reset-design").addEventListener("click",()=>{
   if(!confirm("Reset all stamp settings to the starter design?"))return;
   const defaults={"stamp-text":"MAKE IT","stamp-font":"helvetiker_bold","font-size":"20","design-scale":".82","design-rotation":"0","edge-cap":"0","offset-x":"0","offset-y":"0","plate-width":"64","plate-height":"42","plate-thickness":"5","corner-radius":"4","relief-height":".8","impression-depth":".9","clearance":".22","design-margin":"4","hinge-hole":"1.75","magnet-size":"6","magnet-depth":"2","magnet-count":"2","hinge-angle":"145","pattern-select":"dots","pattern-repeat":"5","material-preset":"pla"};
-  for(const [id,value]of Object.entries(defaults))$("#"+id).value=value;
-  $("#design-rotation-range").value="0";$("#rotation-angle-value").textContent="0°";
+  for(const [id,value]of Object.entries(defaults)){const el=$("#"+id);if(el)el.value=value;}
+  const rotationRange=$("#design-rotation-range"),rotationOutput=$("#rotation-angle-value");
+  if(rotationRange)rotationRange.value="0";if(rotationOutput)rotationOutput.textContent="0°";
   $("#mirror-design").checked=false;$("#hinge-angle-value").textContent="145°";mechanism="hinge";designMode="text";sourceSvgShapes=null;sourceSvgName="";sourceSvgText="";
   document.querySelectorAll(".mechanism").forEach(x=>x.classList.toggle("active",x.dataset.mechanism==="hinge"));
   document.querySelectorAll(".mode-button").forEach(x=>x.classList.toggle("active",x.dataset.mode==="text"));
