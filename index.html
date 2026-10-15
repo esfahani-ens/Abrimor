@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f2ed">
+  <meta name="description" content="Design a custom 3D stamp and export it as an STL file with Abrimor.">
+  <title>Abrimor — 3D Stamp Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="Abrimor home"><span class="brand-mark">A</span><span>abrimor<span class="brand-dot">.</span></span></a>
+    <div class="topbar-note"><span class="status-dot"></span> STAMP STUDIO <span class="topbar-divider">/</span> BROWSER EDITION</div>
+    <a class="topbar-link" href="https://github.com/esfahani-ens/Abrimor" target="_blank" rel="noreferrer">ABOUT THE PROJECT <span aria-hidden="true">↗</span></a>
+  </header>
+
+  <main>
+    <section class="intro">
+      <div class="eyebrow"><span>01</span> YOUR IDEA, IN THREE DIMENSIONS</div>
+      <h1>Make your mark<span class="headline-period">.</span></h1>
+      <p class="intro-copy">A little stamp with a lot to say. Shape your design, turn it around, and take the model with you.</p>
+    </section>
+
+    <section class="studio" aria-label="Stamp design studio">
+      <div class="preview-panel">
+        <div class="panel-heading">
+          <div><span class="panel-kicker">THE OBJECT</span><h2>Live preview</h2></div>
+          <div class="view-badge"><span class="view-dot"></span> 3D VIEW</div>
+        </div>
+        <div class="preview-stage" id="preview-stage">
+          <div class="loading-state" id="loading-state"><span class="loader"></span><span>Preparing your studio…</span></div>
+          <div class="preview-hint"><span class="mouse-icon">↔</span> DRAG TO ROTATE <span class="hint-dot">·</span> SCROLL TO ZOOM</div>
+          <div class="model-label"><span class="model-label-dot"></span><span id="model-label">CUSTOM STAMP</span></div>
+          <div class="axis-label">MM <span>↗</span></div>
+        </div>
+        <div class="preview-footer">
+          <div class="spec-item"><span class="spec-label">BODY</span><span id="body-spec">76 × 48 mm</span></div>
+          <div class="spec-item"><span class="spec-label">RELIEF</span><span>2.0 mm</span></div>
+          <div class="spec-item"><span class="spec-label">FILE TYPE</span><span>.STL</span></div>
+          <button class="reset-view" id="reset-view" type="button" aria-label="Reset camera view">↺ <span>RESET VIEW</span></button>
+        </div>
+      </div>
+
+      <aside class="controls-panel">
+        <div class="controls-heading"><span class="panel-kicker">THE DETAILS</span><span class="step-count">02 <span>/</span> 02</span></div>
+        <h2>Build your stamp</h2>
+        <p class="controls-copy">Every change updates the model instantly.</p>
+
+        <label class="field-label" for="stamp-text">YOUR IMPRESSION <span>01</span></label>
+        <div class="input-wrap">
+          <input id="stamp-text" type="text" value="MAKE IT" maxlength="16" autocomplete="off" aria-describedby="text-help">
+          <span class="input-count" id="text-count">7 / 16</span>
+        </div>
+        <p class="field-help" id="text-help">Keep it short for a crisp, clear impression.</p>
+
+        <div class="field-label dimension-label">STAMP SIZE <span>02</span></div>
+        <div class="dimension-grid">
+          <label class="dimension-field"><span>WIDTH</span><span class="number-wrap"><input id="stamp-width" type="number" min="40" max="100" value="76"><em>mm</em></span></label>
+          <label class="dimension-field"><span>HEIGHT</span><span class="number-wrap"><input id="stamp-height" type="number" min="30" max="80" value="48"><em>mm</em></span></label>
+        </div>
+        <label class="field-label material-label" for="stamp-color">BODY COLOR <span>03</span></label>
+        <div class="color-row">
+          <div class="color-swatches" role="group" aria-label="Choose stamp body color">
+            <button class="swatch active" type="button" data-color="#e5a45f" aria-label="Amber" style="--swatch:#e5a45f"></button>
+            <button class="swatch" type="button" data-color="#5e877a" aria-label="Sage" style="--swatch:#5e877a"></button>
+            <button class="swatch" type="button" data-color="#687a9e" aria-label="Blue" style="--swatch:#687a9e"></button>
+            <button class="swatch" type="button" data-color="#c97868" aria-label="Coral" style="--swatch:#c97868"></button>
+            <button class="swatch" type="button" data-color="#4c4a47" aria-label="Charcoal" style="--swatch:#4c4a47"></button>
+          </div>
+          <span class="color-name" id="color-name">AMBER</span>
+        </div>
+
+        <div class="rule"></div>
+        <button class="export-button" id="export-stl" type="button" disabled>
+          <span class="export-icon">↓</span><span class="export-text">Export 3D model <small>Download print-ready STL</small></span><span class="export-arrow">↗</span>
+        </button>
+        <p class="privacy-note"><span>✳</span> Your design stays in your browser.</p>
+        <div class="notice" id="notice" role="status" aria-live="polite"></div>
+      </aside>
+    </section>
+
+    <footer class="page-footer">
+      <span>MADE FOR MAKING</span><span class="footer-center">ABRIMOR STAMP STUDIO <span>©</span> 2026</span><span>DESIGNED TO LEAVE A MARK</span>
+    </footer>
+  </main>
+</body>
+</html>
