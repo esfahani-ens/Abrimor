@@ -89,7 +89,7 @@
               <button type="button" class="mechanism active" data-mechanism="hinge"><span>⌁</span><strong>Hinge</strong><small>Integrated pivot</small></button>
               <button type="button" class="mechanism" data-mechanism="magnet"><span>⊕</span><strong>Magnet</strong><small>Neodymium pockets</small></button>
             </div>
-            <div class="hinge-only"><label class="range-field"><span>HINGE OPENING <output id="hinge-angle-value">145°</output></span><input id="hinge-angle" type="range" min="0" max="180" value="145"></label></div>
+            <div class="hinge-only"><div class="field-row"><label class="field" for="hinge-hole"><span>PIN HOLE DIAMETER</span><span class="unit-input"><input id="hinge-hole" type="number" min="1" max="4" step="0.05" value="1.75"><em>mm</em></span></label></div><label class="range-field"><span>HINGE OPENING <output id="hinge-angle-value">145°</output></span><input id="hinge-angle" type="range" min="0" max="180" value="145"></label></div>
             <div class="field-row magnet-only" hidden>
               <label class="field" for="magnet-size"><span>MAGNET DIAMETER</span><span class="select-wrap"><select id="magnet-size"><option value="5">5 mm</option><option value="6" selected>6 mm</option><option value="8">8 mm</option></select></span></label>
               <label class="field" for="magnet-depth"><span>POCKET DEPTH</span><span class="unit-input"><input id="magnet-depth" type="number" min="1" max="4" step="0.1" value="2"><em>mm</em></span></label>
