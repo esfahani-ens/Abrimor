@@ -217,7 +217,7 @@ function designGeometry(c,depth,expanded=0,part="male") {
   return geometry;
 }
 function mirrorY(geometry){
-  const g=geometry.toNonIndexed();
+  const g=geometry.index ? geometry.toNonIndexed() : geometry.clone();
   for(const attribute of Object.values(g.attributes)){
     const array=attribute.array,itemSize=attribute.itemSize;
     for(let i=0;i<attribute.count;i+=3){
@@ -232,7 +232,7 @@ function mirrorY(geometry){
   g.computeVertexNormals();g.computeBoundingBox();g.computeBoundingSphere();return g;
 }
 function mirrorX(geometry){
-  const g=geometry.toNonIndexed();
+  const g=geometry.index ? geometry.toNonIndexed() : geometry.clone();
   for(const attribute of Object.values(g.attributes)){
     const array=attribute.array,itemSize=attribute.itemSize;
     for(let i=0;i<attribute.count;i+=3){
