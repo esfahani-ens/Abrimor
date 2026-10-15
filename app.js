@@ -286,7 +286,7 @@ function rebuild() {
       femaleExportPart.position.z=c.thickness;femaleExportPart.rotation.x=Math.PI;
     }
     femaleExport.add(femaleExportPart);
-    const pinExport=pin?new THREE.Group():null;if(pin){pinExport.add(pin);pinExport.position.y=-d;}
+    const pinExport=pin?new THREE.Group():null;if(pin)pinExport.add(pin);
     disposeGroup(preview);
     const maleView=maleExport;
     const femaleView=new THREE.Group();
