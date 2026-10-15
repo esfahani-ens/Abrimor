@@ -62,11 +62,11 @@
         </div>
 
         <div class="export-panel">
-          <div class="export-copy"><span class="panel-kicker">READY WHEN YOU ARE</span><h2>Your files, no account needed.</h2><p>Export the male and female pieces separately. Hinge designs also include a pin.</p></div>
+          <div class="export-copy"><span class="panel-kicker">READY WHEN YOU ARE</span><h2>Your files, no account needed.</h2><p>Download the male and female pieces separately or together in one STL file.</p></div>
           <div class="export-actions">
             <button class="export-button" id="export-male" type="button" disabled><span>↓</span> Male STL</button>
             <button class="export-button secondary" id="export-female" type="button" disabled><span>↓</span> Female STL</button>
-            <button class="export-button pin-export" id="export-pin" type="button" disabled hidden><span>↓</span> Hinge pin</button>
+            <button class="export-button" id="export-full" type="button" disabled><span>↓</span> Full model STL</button>
           </div>
           <div class="notice" id="notice" role="status" aria-live="polite"></div>
         </div>
@@ -126,7 +126,7 @@
               <label class="field" for="offset-x"><span>OFFSET X</span><span class="unit-input"><input id="offset-x" type="number" min="-30" max="30" step="0.1" value="0"><em>mm</em></span></label>
               <label class="field" for="offset-y"><span>OFFSET Y</span><span class="unit-input"><input id="offset-y" type="number" min="-30" max="30" step="0.1" value="0"><em>mm</em></span></label>
             </div>
-            <label class="check-row"><input id="mirror-design" type="checkbox" checked><span class="checkmark"></span><span><strong>Mirror impression</strong><small>Reverses the design on the stamp face.</small></span></label>
+            <label class="check-row"><input id="mirror-design" type="checkbox"><span class="checkmark"></span><span><strong>Mirror impression</strong><small>Reverses the design on the stamp face.</small></span></label>
           </div>
         </div>
 
