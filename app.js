@@ -449,6 +449,7 @@ function applyProject(data){
   if($("#stamp-font").value!==loadedFontName)loadSelectedFont();
   document.querySelectorAll(".mechanism").forEach(x=>x.classList.toggle("active",x.dataset.mechanism===mechanism));
   document.querySelectorAll(".magnet-only").forEach(x=>x.hidden=mechanism!=="magnet");
+  document.querySelectorAll(".hinge-only").forEach(x=>x.hidden=mechanism!=="hinge");
   document.querySelectorAll(".mode-button").forEach(x=>x.classList.toggle("active",x.dataset.mode===designMode));
   document.querySelectorAll(".design-pane").forEach(x=>x.classList.toggle("active",x.dataset.design===designMode));
   $("#text-count").textContent=`${$("#stamp-text").value.length} / 40`;
