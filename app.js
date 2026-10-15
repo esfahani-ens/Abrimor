@@ -90,6 +90,7 @@ function config() {
     magnetDepth: clamp(num("#magnet-depth",2),1,4),
     magnetCount: Number($("#magnet-count").value),
     angle: Number($("#hinge-angle").value || 145) * Math.PI / 180,
+    hingeHole: clamp(num("#hinge-hole",1.75),1,4),
     repetitions: Number($("#pattern-repeat").value)
   };
 }
@@ -118,10 +119,10 @@ function makeRingGeometry(outerRadius,innerRadius,length) {
   g.rotateY(Math.PI/2);
   return g;
 }
-function hingeOffset(c){return c.height/2+2.7*.65;}
+function hingeOffset(c){return c.height/2+2.7;}
 function makeHinge(c,part) {
-  const group=new THREE.Group(),radius=2.7,hole=Math.max(.65,1.15+c.clearance/4);
-  const y=hingeOffset(c),z=c.thickness/2,gap=Math.max(.45,c.clearance*2);
+  const group=new THREE.Group(),radius=2.7,hole=Math.max(.5,c.hingeHole/2);
+  const y=part==="female"?-hingeOffset(c):hingeOffset(c),z=c.thickness,gap=Math.max(.45,c.clearance*2);
   if(part==="male"){
     for(const x of [-c.width*.28,c.width*.28]){
       const length=Math.max(4,c.width*.22-gap);
@@ -136,10 +137,10 @@ function makeHinge(c,part) {
   return group;
 }
 function makePin(c){
-  const length=c.width*.82,g=new THREE.CylinderGeometry(.9,.9,length,24,1,false);
+  const length=c.width*.82,pinRadius=Math.max(.25,c.hingeHole/2-c.clearance/2),g=new THREE.CylinderGeometry(pinRadius,pinRadius,length,24,1,false);
   g.rotateZ(Math.PI/2);
   const mesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:"#555650",roughness:.4}));
-  mesh.position.set(0,0,c.thickness/2);mesh.castShadow=true;return mesh;
+  mesh.position.set(0,hingeOffset(c),c.thickness);mesh.castShadow=true;return mesh;
 }
 function makeMagnetCutters(c) {
   const cutters=[];
@@ -183,7 +184,7 @@ function buildPatternShapes(c) {
   }
   return shapes;
 }
-function designGeometry(c,depth,expanded=0) {
+function designGeometry(c,depth,expanded=0,part="male") {
   let geometry;
   const width=c.width-2*c.margin+expanded*2;
   const height=c.height-2*c.margin+expanded*2;
@@ -202,7 +203,13 @@ function designGeometry(c,depth,expanded=0) {
   geometry.translate(-(bounds.min.x+bounds.max.x)/2,-(bounds.min.y+bounds.max.y)/2,-bounds.min.z);
   geometry.scale(fit,fit,fit);
   if(c.mirror) geometry=mirrorX(geometry);
+  if(part==="female") geometry=mirrorY(geometry);
   return geometry;
+}
+function mirrorY(geometry){
+  const g=geometry.toNonIndexed(),p=g.getAttribute("position");
+  for(let i=0;i<p.count;i+=3){const y1=p.getY(i+1),y2=p.getY(i+2);p.setY(i,-p.getY(i));p.setY(i+1,-y2);p.setY(i+2,-y1);}
+  g.computeVertexNormals();g.computeBoundingBox();g.computeBoundingSphere();return g;
 }
 function mirrorX(geometry){
   let g=geometry.toNonIndexed();
@@ -219,8 +226,8 @@ function mirrorX(geometry){
   }
   g.computeVertexNormals();g.computeBoundingBox();g.computeBoundingSphere();return g;
 }
-function makeDesignBrush(c,depth,baseZ,expanded=0){
-  const geometry=designGeometry(c,depth,expanded);
+function makeDesignBrush(c,depth,baseZ,expanded=0,part="male"){
+  const geometry=designGeometry(c,depth,expanded,part);
   const material=new THREE.MeshStandardMaterial({color:"#efc28d",side:THREE.DoubleSide});
   const brush=new Brush(geometry,material);
   brush.position.set(c.offsetX,c.offsetY,baseZ);
@@ -252,7 +259,7 @@ function makePart(c,part,evaluator,material){
   if(hasDesign){
     const depth=part==="female"?c.depth:c.relief;
     const baseZ=part==="female"?c.thickness-depth:c.thickness-.025;
-    const cutter=makeDesignBrush(c,depth,baseZ,part==="female"?c.clearance:0);
+    const cutter=makeDesignBrush(c,depth,baseZ,part==="female"?c.clearance:0,part);
     plate=booleanOp(plate,cutter,evaluator,part==="female"?SUBTRACTION:ADDITION);
   }
   plate=addMagnetPockets(plate,c,evaluator);
@@ -273,20 +280,20 @@ function rebuild() {
     const maleExport=new THREE.Group();maleExport.add(malePart);
     const femaleExport=new THREE.Group(),femaleExportPart=femalePart.clone(true);
     if(mechanism==="hinge"){
-      maleExport.position.y=-d;
-      femaleExportPart.position.set(0,d,c.thickness);femaleExportPart.rotation.x=Math.PI;
+      femaleExportPart.position.set(0,0,c.thickness*2);femaleExportPart.rotation.x=Math.PI;
+      pin.position.y=d;
     }else{
       femaleExportPart.position.z=c.thickness;femaleExportPart.rotation.x=Math.PI;
     }
     femaleExport.add(femaleExportPart);
-    const pinExport=pin?new THREE.Group():null;if(pin)pinExport.add(pin);
+    const pinExport=pin?new THREE.Group():null;if(pin){pinExport.add(pin);pinExport.position.y=-d;}
     disposeGroup(preview);
     const maleView=maleExport;
     const femaleView=new THREE.Group();
     if(mechanism==="hinge"){
-      femaleView.position.z=c.thickness/2;
-      const part=femalePart.clone(true);part.position.set(0,d,c.thickness/2);part.rotation.x=Math.PI;femaleView.add(part);
-      femaleView.rotation.x=Math.PI-c.angle;
+      femaleView.position.set(0,d,c.thickness);
+      const part=femalePart.clone(true);part.position.set(0,-d,c.thickness);part.rotation.x=Math.PI;femaleView.add(part);
+      femaleView.rotation.x=-c.angle;
     }else{
       femaleView.position.set(0,c.height*.62,c.thickness);const part=femalePart.clone(true);part.rotation.x=Math.PI;femaleView.add(part);
       maleView.position.y=-c.height*.62;
@@ -368,7 +375,7 @@ document.querySelectorAll("input,select,textarea").forEach(input=>{
     if(input.id==="magnet-count")$("#magnet-count-value").textContent=input.value;
     if(input.id==="hinge-angle"){
       $("#hinge-angle-value").textContent=input.value+"°";
-      if(hingePreview)hingePreview.rotation.x=Math.PI-Number(input.value)*Math.PI/180;
+      if(hingePreview)hingePreview.rotation.x=-Number(input.value)*Math.PI/180;
       return;
     }
     if(input.type!=="range")scheduleRebuild();
@@ -423,7 +430,7 @@ $("#svg-file").addEventListener("change",async event=>{
 });
 function projectData(){
   return {version:1,name:$("#project-name").value,mechanism,designMode,svgName:sourceSvgName,svgText:sourceSvgText,
-    values:Object.fromEntries(["stamp-text","stamp-font","font-size","design-scale","design-rotation","offset-x","offset-y","mirror-design","plate-width","plate-height","plate-thickness","corner-radius","relief-height","impression-depth","clearance","design-margin","magnet-size","magnet-depth","magnet-count","hinge-angle","pattern-select","pattern-repeat","material-preset"].map(id=>[id,$("#"+id).type==="checkbox"?$("#"+id).checked:$("#"+id).value]))};
+    values:Object.fromEntries(["stamp-text","stamp-font","font-size","design-scale","design-rotation","offset-x","offset-y","mirror-design","plate-width","plate-height","plate-thickness","corner-radius","relief-height","impression-depth","clearance","design-margin","hinge-hole","magnet-size","magnet-depth","magnet-count","hinge-angle","pattern-select","pattern-repeat","material-preset"].map(id=>[id,$("#"+id).type==="checkbox"?$("#"+id).checked:$("#"+id).value]))};
 }
 function applyProject(data){
   if(data.version!==1||!data.values)throw new Error("Unsupported project file.");
@@ -454,7 +461,7 @@ $("#load-project").addEventListener("change",async event=>{
 });
 $("#reset-design").addEventListener("click",()=>{
   if(!confirm("Reset all stamp settings to the starter design?"))return;
-  const defaults={"stamp-text":"MAKE IT","stamp-font":"helvetiker_bold","font-size":"20","design-scale":".82","design-rotation":"0","offset-x":"0","offset-y":"0","plate-width":"64","plate-height":"42","plate-thickness":"5","corner-radius":"4","relief-height":".8","impression-depth":".9","clearance":".22","design-margin":"4","magnet-size":"6","magnet-depth":"2","magnet-count":"2","hinge-angle":"145","pattern-select":"dots","pattern-repeat":"5","material-preset":"pla"};
+  const defaults={"stamp-text":"MAKE IT","stamp-font":"helvetiker_bold","font-size":"20","design-scale":".82","design-rotation":"0","offset-x":"0","offset-y":"0","plate-width":"64","plate-height":"42","plate-thickness":"5","corner-radius":"4","relief-height":".8","impression-depth":".9","clearance":".22","design-margin":"4","hinge-hole":"1.75","magnet-size":"6","magnet-depth":"2","magnet-count":"2","hinge-angle":"145","pattern-select":"dots","pattern-repeat":"5","material-preset":"pla"};
   for(const [id,value]of Object.entries(defaults))$("#"+id).value=value;
   $("#mirror-design").checked=true;$("#hinge-angle-value").textContent="145°";mechanism="hinge";designMode="text";sourceSvgShapes=null;sourceSvgName="";sourceSvgText="";
   document.querySelectorAll(".mechanism").forEach(x=>x.classList.toggle("active",x.dataset.mechanism==="hinge"));
