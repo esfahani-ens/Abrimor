@@ -12,7 +12,7 @@ const loading = $("#loading-state");
 const notice = $("#notice");
 const exportMale = $("#export-male");
 const exportFemale = $("#export-female");
-const exportPin = $("#export-pin");
+const exportFull = $("#export-full");
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.setSize(stage.clientWidth, stage.clientHeight);
@@ -55,7 +55,7 @@ let sourceSvgShapes = null;
 let sourceSvgName = "";
 let sourceSvgText = "";
 let loadedFontName = "helvetiker_bold";
-let model = { male: null, female: null, pin: null, material: null };
+let model = { male: null, female: null, full: null, material: null };
 let mechanism = "hinge";
 let designMode = "text";
 let viewMode = "simple";
@@ -128,13 +128,22 @@ function makeHinge(c,part) {
       const length=Math.max(4,c.width*.22-gap);
       const ring=new THREE.Mesh(makeRingGeometry(radius,hole,length),bodyMaterial);
       ring.position.set(x-length/2,y,z);ring.castShadow=true;group.add(ring);
+      addHingeRib(group,c,x,length,1);
     }
   }else{
     const length=Math.max(5,c.width*.34-gap);
     const ring=new THREE.Mesh(makeRingGeometry(radius,hole,length),bodyMaterial);
     ring.position.set(-length/2,y,z);ring.castShadow=true;group.add(ring);
+    addHingeRib(group,c,0,length,part==="female"?-1:1);
   }
   return group;
+}
+function addHingeRib(group,c,xCenter,length,side){
+  const outerRadius=2.7,edge=side*c.height/2;
+  const geometry=new THREE.BoxGeometry(length,outerRadius+1.2,2.6);
+  const rib=new THREE.Mesh(geometry,bodyMaterial);
+  rib.position.set(xCenter,edge+side*(outerRadius/2),c.thickness-.65);
+  rib.castShadow=true;rib.receiveShadow=true;group.add(rib);
 }
 function makePin(c){
   const length=c.width*.82,pinRadius=Math.max(.25,c.hingeHole/2-c.clearance/2),g=new THREE.CylinderGeometry(pinRadius,pinRadius,length,24,1,false);
@@ -277,8 +286,8 @@ function makePart(c,part,evaluator,material){
 }
 function rebuild() {
   if(!font||busy)return;
-  busy=true;notice.textContent="Building raised and recessed stamp faces…";
-  exportMale.disabled=exportFemale.disabled=true;exportPin.disabled=true;
+  busy=true;notice.textContent="Building both stamp faces…";
+  exportMale.disabled=exportFemale.disabled=exportFull.disabled=true;
   try{
     const c=config(),evaluator=new Evaluator();evaluator.useGroups=false;
     bodyMaterial.color.set(viewMode==="white"?"#eeeeeb":(materialColors[$("#material-preset").value]||materialColors.pla));
@@ -308,12 +317,13 @@ function rebuild() {
     dimensionAnchor=maleView;dimensionState={width:c.width,height:c.height,thickness:c.thickness};
     hingePreview=mechanism==="hinge"?femaleView:null;
     preview.add(maleView,femaleView);if(pin)preview.add(pin.clone());
-    model={male:maleExport,female:femaleExport,pin:pinExport,material:bodyMaterial};
+    model={male:maleExport,female:femaleExport,full:null,material:bodyMaterial};
     $("#body-spec").textContent=c.width+" × "+c.height+" mm";$("#relief-spec").textContent=c.relief.toFixed(1)+" mm";$("#offset-spec").textContent=c.clearance.toFixed(2)+" mm";
     $("#dimension-width").textContent=c.width+" mm";$("#dimension-height").textContent=c.height+" mm";
     const designName=designMode==="text"?"TEXT":designMode==="upload"?"SVG LOGO":$("#pattern-select").value.toUpperCase();
     $("#model-label").textContent=mechanism.toUpperCase()+" · "+designName;
-    exportMale.disabled=exportFemale.disabled=false;exportPin.hidden=mechanism!=="hinge";exportPin.disabled=mechanism!=="hinge";notice.textContent="";
+    model.full=new THREE.Group();model.full.add(maleExport.clone(true),femaleExport.clone(true));
+    exportMale.disabled=exportFemale.disabled=exportFull.disabled=false;notice.textContent="";
   }catch(error){console.error(error);notice.textContent=error.message||"Could not build this model. Check the design and dimensions.";
   }finally{busy=false;if(rebuildQueued){rebuildQueued=false;scheduleRebuild();}}
 }
@@ -405,20 +415,20 @@ $("#dimensions-toggle").addEventListener("click",()=>{
 $("#reset-view").addEventListener("click",()=>{
   camera.position.set(110,-150,130);controls.target.set(0,0,4);controls.update();
 });
-function simplifyShape(shape,segments=48){
+function simplifyShape(shape,segments=144){
   const points=shape.getSpacedPoints(segments);if(points.length<3)return null;
   const result=new THREE.Shape();result.moveTo(points[0].x,points[0].y);
   for(let i=1;i<points.length;i++)result.lineTo(points[i].x,points[i].y);result.closePath();
-  for(const hole of shape.holes){const hp=hole.getSpacedPoints(Math.max(24,Math.floor(segments/2)));if(hp.length<3)continue;
+  for(const hole of shape.holes){const hp=hole.getSpacedPoints(Math.max(72,Math.floor(segments/2)));if(hp.length<3)continue;
     const path=new THREE.Path();path.moveTo(hp[0].x,hp[0].y);for(let i=1;i<hp.length;i++)path.lineTo(hp[i].x,hp[i].y);path.closePath();result.holes.push(path);}
   return result;
 }
 function parseSvgShapes(text){
   if(text.length>250000)throw new Error("This SVG is too large for a responsive preview (250 KB maximum). Simplify or export a smaller SVG.");
   const pathCount=(text.match(/<path\b/gi)||[]).length,commandCount=(text.match(/[MmLlHhVvCcSsQqTtAaZz]/g)||[]).length;
-  if(pathCount>50||commandCount>12000)throw new Error("This SVG has too many vector segments. Simplify it in a vector editor and try again.");
+  if(pathCount>150||commandCount>36000)throw new Error("This SVG has too many vector segments. Simplify it in a vector editor and try again.");
   const svg=new SVGLoader().parse(text),raw=svg.paths.flatMap(path=>SVGLoader.createShapes(path));
-  if(raw.length>24)throw new Error("This SVG has more than 24 filled regions. Combine or simplify its paths and retry.");
+  if(raw.length>72)throw new Error("This SVG has more than 24 filled regions. Combine or simplify its paths and retry.");
   const shapes=raw.map(shape=>simplifyShape(shape)).filter(Boolean);
   if(!shapes.length)throw new Error("No filled SVG paths found. Convert strokes to filled paths and retry.");
   return shapes;
@@ -472,7 +482,7 @@ $("#reset-design").addEventListener("click",()=>{
   if(!confirm("Reset all stamp settings to the starter design?"))return;
   const defaults={"stamp-text":"MAKE IT","stamp-font":"helvetiker_bold","font-size":"20","design-scale":".82","design-rotation":"0","offset-x":"0","offset-y":"0","plate-width":"64","plate-height":"42","plate-thickness":"5","corner-radius":"4","relief-height":".8","impression-depth":".9","clearance":".22","design-margin":"4","hinge-hole":"1.75","magnet-size":"6","magnet-depth":"2","magnet-count":"2","hinge-angle":"145","pattern-select":"dots","pattern-repeat":"5","material-preset":"pla"};
   for(const [id,value]of Object.entries(defaults))$("#"+id).value=value;
-  $("#mirror-design").checked=true;$("#hinge-angle-value").textContent="145°";mechanism="hinge";designMode="text";sourceSvgShapes=null;sourceSvgName="";sourceSvgText="";
+  $("#mirror-design").checked=false;$("#hinge-angle-value").textContent="145°";mechanism="hinge";designMode="text";sourceSvgShapes=null;sourceSvgName="";sourceSvgText="";
   document.querySelectorAll(".mechanism").forEach(x=>x.classList.toggle("active",x.dataset.mechanism==="hinge"));
   document.querySelectorAll(".mode-button").forEach(x=>x.classList.toggle("active",x.dataset.mode==="text"));
   document.querySelectorAll(".design-pane").forEach(x=>x.classList.toggle("active",x.dataset.design==="text"));
@@ -504,7 +514,7 @@ function exportPart(group,name){
 }
 exportMale.addEventListener("click",()=>exportPart(model.male,"male"));
 exportFemale.addEventListener("click",()=>exportPart(model.female,"female"));
-exportPin.addEventListener("click",()=>exportPart(model.pin,"hinge-pin"));
+exportFull.addEventListener("click",()=>exportPart(model.full,"full-model"));
 try{
   const saved=localStorage.getItem("abrimor-project");
   if(saved)applyProject(JSON.parse(saved));
