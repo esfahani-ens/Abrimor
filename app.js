@@ -53,6 +53,7 @@ scene.add(preview);
 let font = null;
 let sourceSvgShapes = null;
 let sourceSvgName = "";
+let sourceSvgText = "";
 let model = { male: null, female: null, pin: null, material: null };
 let mechanism = "hinge";
 let designMode = "text";
@@ -71,7 +72,7 @@ function config() {
     thickness: clamp(num("#plate-thickness",5),2,15),
     corner: clamp(num("#corner-radius",4),0,15),
     relief: clamp(num("#relief-height",.8),.2,4),
-    depth: clamp(num("#impression-depth",.9),.2,4),
+    depth: clamp(num("#impression-depth",.9),.2,Math.min(4,Math.max(.2,num("#plate-thickness",5)-.2))),
     clearance: clamp(num("#clearance",.22),.05,1),
     margin: clamp(num("#design-margin",4),1,12),
     scale: clamp(num("#design-scale",.82),.3,1.2),
@@ -133,7 +134,7 @@ function makeHinge(c,part) {
 }
 function makePin(c){
   const length=c.width*.82;
-  const g=new THREE.CylinderGeometry(0.9,length/2,24,1,false);
+  const g=new THREE.CylinderGeometry(0.9,0.9,length,24,1,false);
   g.rotateZ(Math.PI/2);
   const mesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:"#555650",roughness:.4}));
   mesh.position.set(0,c.height/2+2.1,c.thickness/2);
@@ -271,7 +272,7 @@ function rebuild() {
     const c=config();
     const evaluator=new Evaluator();
     evaluator.useGroups=false;
-    const plaColor=materialColors[$("#material-preset").value]||materialColors.pla;
+    const plaColor=viewMode==="white"?"#eeeeeb":(materialColors[$("#material-preset").value]||materialColors.pla);
     bodyMaterial.color.set(plaColor);
     const male=makePart(c,"male",evaluator,bodyMaterial);
     const female=makePart(c,"female",evaluator,bodyMaterial);
@@ -305,14 +306,20 @@ function scheduleRebuild(){
 }
 function animate(){requestAnimationFrame(animate);controls.update();renderer.render(scene,camera);}
 animate();
-new FontLoader().load("https://cdn.jsdelivr.net/npm/three@0.180.0/examples/fonts/helvetiker_bold.typeface.json",loaded=>{
+function loadSelectedFont(){
+  const fontName=$("#stamp-font").value;
+  exportMale.disabled=exportFemale.disabled=true;
+  new FontLoader().load(`https://cdn.jsdelivr.net/npm/three@0.180.0/examples/fonts/${fontName}.typeface.json`,loaded=>{
   font=loaded;
   rebuild();
   loading.classList.add("hidden");
 },undefined,()=>{
-  loading.innerHTML="<span>Could not load the 3D font. Check your connection and refresh.</span>";
-  notice.textContent="Three.js fonts load from jsDelivr.";
+  notice.textContent="Could not load the selected font. Try another style or check your connection.";
+  exportMale.disabled=exportFemale.disabled=false;
 });
+}
+loadSelectedFont();
+$("#stamp-font").addEventListener("change",loadSelectedFont);
 const resizeObserver=new ResizeObserver(()=>{
   const w=stage.clientWidth,h=stage.clientHeight;if(!w||!h)return;
   renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();
@@ -338,7 +345,7 @@ document.querySelectorAll(".mode-button").forEach(button=>button.addEventListene
   scheduleRebuild();
 }));
 document.querySelectorAll("input,select,textarea").forEach(input=>{
-  if(["svg-file","load-project"].includes(input.id))return;
+  if(["svg-file","load-project","stamp-font"].includes(input.id))return;
   input.addEventListener("input",()=>{
     if(input.id==="stamp-text")$("#text-count").textContent=`${input.value.length} / 40`;
     if(input.id==="pattern-repeat")$("#repeat-value").textContent=input.value;
@@ -368,6 +375,7 @@ $("#svg-file").addEventListener("change",async event=>{
     const text=await file.text();
     if(!text.includes("<svg"))throw new Error("That file does not contain an SVG image.");
     const svg=new SVGLoader().parse(text);
+    sourceSvgText=text;
     sourceSvgShapes=svg.paths.flatMap(path=>SVGLoader.createShapes(path));
     if(!sourceSvgShapes.length)throw new Error("No filled SVG paths found. Convert strokes to filled paths and retry.");
     sourceSvgName=file.name;$("#file-status").textContent=`${file.name} · ${sourceSvgShapes.length} filled path(s)`;
@@ -378,12 +386,14 @@ $("#svg-file").addEventListener("change",async event=>{
   }catch(error){$("#file-status").textContent=error.message;notice.textContent=error.message;}
 });
 function projectData(){
-  return {version:1,name:$("#project-name").value,mechanism,designMode,svgName:sourceSvgName,
+  return {version:1,name:$("#project-name").value,mechanism,designMode,svgName:sourceSvgName,svgText:sourceSvgText,
     values:Object.fromEntries(["stamp-text","stamp-font","font-size","design-scale","design-rotation","offset-x","offset-y","mirror-design","plate-width","plate-height","plate-thickness","corner-radius","relief-height","impression-depth","clearance","design-margin","magnet-size","magnet-depth","magnet-count","pattern-select","pattern-repeat","material-preset"].map(id=>[id,$("#"+id).type==="checkbox"?$("#"+id).checked:$("#"+id).value]))};
 }
 function applyProject(data){
   if(data.version!==1||!data.values)throw new Error("Unsupported project file.");
   $("#project-name").value=data.name||"My custom stamp";mechanism=data.mechanism||"hinge";designMode=data.designMode||"text";
+  sourceSvgText=data.svgText||"";sourceSvgName=data.svgName||"";
+  sourceSvgShapes=sourceSvgText?new SVGLoader().parse(sourceSvgText).paths.flatMap(path=>SVGLoader.createShapes(path)):null;
   for(const [id,value] of Object.entries(data.values)){const el=$("#"+id);if(el){if(el.type==="checkbox")el.checked=Boolean(value);else el.value=value;}}
   document.querySelectorAll(".mechanism").forEach(x=>x.classList.toggle("active",x.dataset.mechanism===mechanism));
   document.querySelectorAll(".magnet-only").forEach(x=>x.hidden=mechanism!=="magnet");
@@ -408,7 +418,7 @@ $("#reset-design").addEventListener("click",()=>{
   if(!confirm("Reset all stamp settings to the starter design?"))return;
   const defaults={"stamp-text":"MAKE IT","font-size":"20","design-scale":".82","design-rotation":"0","offset-x":"0","offset-y":"0","plate-width":"64","plate-height":"42","plate-thickness":"5","corner-radius":"4","relief-height":".8","impression-depth":".9","clearance":".22","design-margin":"4","magnet-size":"6","magnet-depth":"2","magnet-count":"2","pattern-repeat":"5"};
   for(const [id,value]of Object.entries(defaults))$("#"+id).value=value;
-  $("#mirror-design").checked=true;mechanism="hinge";designMode="text";sourceSvgShapes=null;sourceSvgName="";
+  $("#mirror-design").checked=true;mechanism="hinge";designMode="text";sourceSvgShapes=null;sourceSvgName="";sourceSvgText="";
   document.querySelectorAll(".mechanism").forEach(x=>x.classList.toggle("active",x.dataset.mechanism==="hinge"));
   document.querySelectorAll(".mode-button").forEach(x=>x.classList.toggle("active",x.dataset.mode==="text"));
   document.querySelectorAll(".design-pane").forEach(x=>x.classList.toggle("active",x.dataset.design==="text"));
