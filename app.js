@@ -200,11 +200,11 @@ function designGeometry(c,depth,expanded=0,part="male") {
   const height=c.height-2*c.margin+expanded*2;
   if(designMode==="text"){
     const text=$("#stamp-text").value.trim()||" ";
-    geometry=new TextGeometry(text,{font,size:clamp(num("#font-size",20),8,32),depth,curveSegments:8,bevelEnabled:c.edgeCap>0,bevelSegments:3,bevelSize:c.edgeCap,bevelThickness:c.edgeCap});
+    geometry=new TextGeometry(text,{font,size:clamp(num("#font-size",20),8,32),depth,curveSegments:8,bevelEnabled:c.edgeCap>0,bevelSegments:1,bevelSize:c.edgeCap,bevelThickness:c.edgeCap});
   }else{
     const shapes=designMode==="upload"?(sourceSvgShapes||[]):buildPatternShapes(c);
     if(!shapes.length) throw new Error("Upload an SVG with filled paths before creating the mold.");
-    geometry=new THREE.ExtrudeGeometry(shapes,{depth,bevelEnabled:c.edgeCap>0,bevelSegments:3,bevelSize:c.edgeCap,bevelThickness:c.edgeCap,curveSegments:4});
+    geometry=new THREE.ExtrudeGeometry(shapes,{depth,bevelEnabled:c.edgeCap>0,bevelSegments:1,bevelSize:c.edgeCap,bevelThickness:c.edgeCap,curveSegments:4});
   }
   geometry.computeBoundingBox();
   const bounds=geometry.boundingBox;
@@ -217,15 +217,18 @@ function designGeometry(c,depth,expanded=0,part="male") {
   return geometry;
 }
 function mirrorY(geometry){
-  const g=geometry.toNonIndexed(),p=g.getAttribute("position");
-  for(let i=0;i<p.count;i+=3){
-    p.setY(i,-p.getY(i));p.setY(i+1,-p.getY(i+1));p.setY(i+2,-p.getY(i+2));
-    for(const name of Object.keys(g.attributes)){
-      const a=g.getAttribute(name),values=[];
-      for(let k=0;k<a.itemSize;k++)values.push(a.array[(i+1)*a.itemSize+k]);
-      for(let k=0;k<a.itemSize;k++){a.array[(i+1)*a.itemSize+k]=a.array[(i+2)*a.itemSize+k];a.array[(i+2)*a.itemSize+k]=values[k];}
+  const g=geometry.toNonIndexed();
+  for(const attribute of Object.values(g.attributes)){
+    const array=attribute.array,itemSize=attribute.itemSize;
+    for(let i=0;i<attribute.count;i+=3){
+      for(let k=0;k<itemSize;k++){
+        const a=(i+1)*itemSize+k,b=(i+2)*itemSize+k,temp=array[a];
+        array[a]=array[b];array[b]=temp;
+      }
     }
   }
+  const position=g.getAttribute("position");
+  for(let i=0;i<position.count;i++)position.setY(i,-position.getY(i));
   g.computeVertexNormals();g.computeBoundingBox();g.computeBoundingSphere();return g;
 }
 function mirrorX(geometry){
@@ -519,10 +522,21 @@ function downloadText(text,name,type){const blob=new Blob([text],{type});downloa
 function downloadBlob(blob,name){
   const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
+function bakeWorldGeometry(group){
+  const baked=new THREE.Group();
+  group.updateMatrixWorld(true);
+  group.traverse(object=>{
+    if(!object.isMesh||!object.geometry)return;
+    const geometry=object.geometry.clone();
+    geometry.applyMatrix4(object.matrixWorld);
+    baked.add(new THREE.Mesh(geometry,object.material));
+  });
+  return baked;
+}
 function exportPart(group,name){
   if(!group)return;
   try{
-    const data=new STLExporter().parse(group,{binary:true});
+    const data=new STLExporter().parse(bakeWorldGeometry(group),{binary:true});
     downloadBlob(new Blob([data],{type:"model/stl"}),`${slug($("#project-name").value)}-${name}.stl`);
     notice.textContent=`${name[0].toUpperCase()+name.slice(1)} STL downloaded.`;
   }catch(error){console.error(error);notice.textContent="STL export failed. Check the design and try again.";}
