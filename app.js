@@ -82,6 +82,7 @@ function config() {
     clearance: clamp(num("#clearance",.22),.05,1),
     margin: clamp(num("#design-margin",4),1,12),
     scale: clamp(num("#design-scale",.82),.3,1.2),
+    edgeCap: clamp(num("#edge-cap",0),0,.8),
     rotation: num("#design-rotation",0) * Math.PI / 180,
     offsetX: clamp(num("#offset-x",0),-30,30),
     offsetY: clamp(num("#offset-y",0),-30,30),
@@ -199,18 +200,18 @@ function designGeometry(c,depth,expanded=0,part="male") {
   const height=c.height-2*c.margin+expanded*2;
   if(designMode==="text"){
     const text=$("#stamp-text").value.trim()||" ";
-    geometry=new TextGeometry(text,{font,size:clamp(num("#font-size",20),8,32),depth,curveSegments:8,bevelEnabled:false});
+    geometry=new TextGeometry(text,{font,size:clamp(num("#font-size",20),8,32),depth,curveSegments:8,bevelEnabled:c.edgeCap>0,bevelSegments:3,bevelSize:c.edgeCap,bevelThickness:c.edgeCap});
   }else{
     const shapes=designMode==="upload"?(sourceSvgShapes||[]):buildPatternShapes(c);
     if(!shapes.length) throw new Error("Upload an SVG with filled paths before creating the mold.");
-    geometry=new THREE.ExtrudeGeometry(shapes,{depth,bevelEnabled:false,curveSegments:4});
+    geometry=new THREE.ExtrudeGeometry(shapes,{depth,bevelEnabled:c.edgeCap>0,bevelSegments:3,bevelSize:c.edgeCap,bevelThickness:c.edgeCap,curveSegments:4});
   }
   geometry.computeBoundingBox();
   const bounds=geometry.boundingBox;
   const bw=Math.max(.01,bounds.max.x-bounds.min.x),bh=Math.max(.01,bounds.max.y-bounds.min.y);
   const fit=Math.min(width/bw,height/bh)*c.scale;
   geometry.translate(-(bounds.min.x+bounds.max.x)/2,-(bounds.min.y+bounds.max.y)/2,-bounds.min.z);
-  geometry.scale(fit,fit,fit);
+  geometry.scale(fit,fit,1);
   if(c.mirror) geometry=mirrorX(geometry);
   if(part==="female") geometry=mirrorY(geometry);
   return geometry;
@@ -228,18 +229,18 @@ function mirrorY(geometry){
   g.computeVertexNormals();g.computeBoundingBox();g.computeBoundingSphere();return g;
 }
 function mirrorX(geometry){
-  let g=geometry.toNonIndexed();
-  const p=g.getAttribute("position");
-  for(let i=0;i<p.count;i+=3){
-    const x0=p.getX(i),x1=p.getX(i+1),x2=p.getX(i+2);
-    p.setX(i,-x0);p.setX(i+1,-x2);p.setX(i+2,-x1);
-    for(const name of Object.keys(g.attributes)){
-      if(name==="position")continue;
-      const a=g.getAttribute(name),vals=[];
-      for(let k=0;k<a.itemSize;k++) vals.push(a.array[(i+1)*a.itemSize+k]);
-      for(let k=0;k<a.itemSize;k++){a.array[(i+1)*a.itemSize+k]=a.array[(i+2)*a.itemSize+k];a.array[(i+2)*a.itemSize+k]=vals[k];}
+  const g=geometry.toNonIndexed();
+  for(const attribute of Object.values(g.attributes)){
+    const array=attribute.array,itemSize=attribute.itemSize;
+    for(let i=0;i<attribute.count;i+=3){
+      for(let k=0;k<itemSize;k++){
+        const a=(i+1)*itemSize+k,b=(i+2)*itemSize+k,temp=array[a];
+        array[a]=array[b];array[b]=temp;
+      }
     }
   }
+  const position=g.getAttribute("position");
+  for(let i=0;i<position.count;i++)position.setX(i,-position.getX(i));
   g.computeVertexNormals();g.computeBoundingBox();g.computeBoundingSphere();return g;
 }
 function makeDesignBrush(c,depth,baseZ,expanded=0,part="male"){
@@ -273,8 +274,8 @@ function makePart(c,part,evaluator,material){
   let plate=new Brush(plateGeometry(c),material);plate.position.z=0;plate.updateMatrixWorld(true);
   const hasDesign=!(designMode==="text"&&!$("#stamp-text").value.trim());
   if(hasDesign){
-    const depth=part==="female"?c.depth:c.relief;
-    const baseZ=part==="female"?c.thickness-depth:c.thickness-.025;
+    const depth=part==="female"?c.depth+.05:c.relief;
+    const baseZ=part==="female"?c.thickness-c.depth-2*c.edgeCap:c.thickness-.025;
     const cutter=makeDesignBrush(c,depth,baseZ,part==="female"?c.clearance:0,part);
     plate=booleanOp(plate,cutter,evaluator,part==="female"?SUBTRACTION:ADDITION);
   }
@@ -296,14 +297,11 @@ function rebuild() {
     const malePart=makePart(c,"male",maleEvaluator,bodyMaterial),femalePart=makePart(c,"female",femaleEvaluator,bodyMaterial);
     const d=hingeOffset(c),pin=mechanism==="hinge"?makePin(c):null;
     const maleExport=new THREE.Group();maleExport.add(malePart);
-    const femaleExport=new THREE.Group(),femaleExportPart=femalePart.clone(true);
-    if(mechanism==="hinge"){
-      femaleExportPart.position.set(0,0,c.thickness*2);femaleExportPart.rotation.x=Math.PI;
-      pin.position.y=d;
-    }else{
-      femaleExportPart.position.z=c.thickness;femaleExportPart.rotation.x=Math.PI;
-    }
-    femaleExport.add(femaleExportPart);
+    // Export each half face-up for printing; flipping the female half puts its
+    // hinge barrel on the underside and hides the impression in combined STL.
+    const femaleExport=new THREE.Group();
+    femaleExport.add(femalePart.clone(true));
+    if(pin)pin.position.y=d;
     // The hinge pin is preview-only; both hinge halves include their own barrels.
     disposeGroup(preview);
     const maleView=maleExport;
@@ -324,7 +322,10 @@ function rebuild() {
     $("#dimension-width").textContent=c.width+" mm";$("#dimension-height").textContent=c.height+" mm";
     const designName=designMode==="text"?"TEXT":designMode==="upload"?"SVG LOGO":$("#pattern-select").value.toUpperCase();
     $("#model-label").textContent=mechanism.toUpperCase()+" · "+designName;
-    model.full=new THREE.Group();model.full.add(maleExport.clone(true),femaleExport.clone(true));
+    model.full=new THREE.Group();
+    const printableMale=malePart.clone(true),printableFemale=femalePart.clone(true);
+    printableFemale.position.x=c.width+12;
+    model.full.add(printableMale,printableFemale);
     exportMale.disabled=exportFemale.disabled=exportFull.disabled=false;notice.textContent="";
   }catch(error){console.error(error);notice.textContent=error.message||"Could not build this model. Check the design and dimensions.";
   }finally{busy=false;if(rebuildQueued){rebuildQueued=false;scheduleRebuild();}}
@@ -392,6 +393,8 @@ document.querySelectorAll("input,select,textarea").forEach(input=>{
   input.addEventListener("input",()=>{
     if(input.id==="stamp-text")$("#text-count").textContent=`${input.value.length} / 40`;
     if(input.id==="pattern-repeat")$("#repeat-value").textContent=input.value;
+    if(input.id==="design-rotation")$("#design-rotation-range").value=input.value;
+    if(input.id==="design-rotation-range"){ $("#design-rotation").value=input.value; scheduleRebuild(); }
     if(input.id==="magnet-count")$("#magnet-count-value").textContent=input.value;
     if(input.id==="hinge-angle"){
       $("#hinge-angle-value").textContent=input.value+"°";
@@ -409,6 +412,11 @@ document.querySelectorAll(".view-button").forEach(button=>button.addEventListene
   stage.classList.toggle("white-view",viewMode==="white");
   grid.visible=viewMode==="technical";
   bodyMaterial.color.set(viewMode==="white"?"#eeeeeb":materialColors[$("#material-preset").value]);
+}));
+document.querySelectorAll(".rotation-preset").forEach(button=>button.addEventListener("click",()=>{
+  $("#design-rotation").value=button.dataset.degrees;
+  $("#design-rotation-range").value=button.dataset.degrees;
+  scheduleRebuild();
 }));
 $("#dimensions-toggle").addEventListener("click",()=>{
   const button=$("#dimensions-toggle");dimensionsVisible=button.getAttribute("aria-pressed")!=="true";
@@ -450,7 +458,7 @@ $("#svg-file").addEventListener("change",async event=>{
 });
 function projectData(){
   return {version:1,name:$("#project-name").value,mechanism,designMode,svgName:sourceSvgName,svgText:sourceSvgText,
-    values:Object.fromEntries(["stamp-text","stamp-font","font-size","design-scale","design-rotation","offset-x","offset-y","mirror-design","plate-width","plate-height","plate-thickness","corner-radius","relief-height","impression-depth","clearance","design-margin","hinge-hole","magnet-size","magnet-depth","magnet-count","hinge-angle","pattern-select","pattern-repeat","material-preset"].map(id=>[id,$("#"+id).type==="checkbox"?$("#"+id).checked:$("#"+id).value]))};
+    values:Object.fromEntries(["stamp-text","stamp-font","font-size","design-scale","design-rotation","edge-cap","offset-x","offset-y","mirror-design","plate-width","plate-height","plate-thickness","corner-radius","relief-height","impression-depth","clearance","design-margin","hinge-hole","magnet-size","magnet-depth","magnet-count","hinge-angle","pattern-select","pattern-repeat","material-preset"].map(id=>[id,$("#"+id).type==="checkbox"?$("#"+id).checked:$("#"+id).value]))};
 }
 function applyProject(data){
   if(data.version!==1||!data.values)throw new Error("Unsupported project file.");
@@ -464,6 +472,7 @@ function applyProject(data){
   document.querySelectorAll(".hinge-only").forEach(x=>x.hidden=mechanism!=="hinge");
   document.querySelectorAll(".mode-button").forEach(x=>x.classList.toggle("active",x.dataset.mode===designMode));
   document.querySelectorAll(".design-pane").forEach(x=>x.classList.toggle("active",x.dataset.design===designMode));
+  $("#design-rotation-range").value=$("#design-rotation").value;
   $("#text-count").textContent=`${$("#stamp-text").value.length} / 40`;
   $("#repeat-value").textContent=$("#pattern-repeat").value;
   $("#magnet-count-value").textContent=$("#magnet-count").value;
@@ -482,7 +491,7 @@ $("#load-project").addEventListener("change",async event=>{
 });
 $("#reset-design").addEventListener("click",()=>{
   if(!confirm("Reset all stamp settings to the starter design?"))return;
-  const defaults={"stamp-text":"MAKE IT","stamp-font":"helvetiker_bold","font-size":"20","design-scale":".82","design-rotation":"0","offset-x":"0","offset-y":"0","plate-width":"64","plate-height":"42","plate-thickness":"5","corner-radius":"4","relief-height":".8","impression-depth":".9","clearance":".22","design-margin":"4","hinge-hole":"1.75","magnet-size":"6","magnet-depth":"2","magnet-count":"2","hinge-angle":"145","pattern-select":"dots","pattern-repeat":"5","material-preset":"pla"};
+  const defaults={"stamp-text":"MAKE IT","stamp-font":"helvetiker_bold","font-size":"20","design-scale":".82","design-rotation":"0","edge-cap":"0","offset-x":"0","offset-y":"0","plate-width":"64","plate-height":"42","plate-thickness":"5","corner-radius":"4","relief-height":".8","impression-depth":".9","clearance":".22","design-margin":"4","hinge-hole":"1.75","magnet-size":"6","magnet-depth":"2","magnet-count":"2","hinge-angle":"145","pattern-select":"dots","pattern-repeat":"5","material-preset":"pla"};
   for(const [id,value]of Object.entries(defaults))$("#"+id).value=value;
   $("#mirror-design").checked=false;$("#hinge-angle-value").textContent="145°";mechanism="hinge";designMode="text";sourceSvgShapes=null;sourceSvgName="";sourceSvgText="";
   document.querySelectorAll(".mechanism").forEach(x=>x.classList.toggle("active",x.dataset.mechanism==="hinge"));
