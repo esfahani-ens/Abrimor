@@ -64,6 +64,7 @@ let rebuildQueued = false;
 let debounceTimer;
 let dimensionAnchor = null;
 let dimensionState = null;
+let hingePreview = null;
 let dimensionsVisible = false;
 let history = [];
 let bodyMaterial = new THREE.MeshStandardMaterial({ color: "#e0a165", roughness: .52, metalness: .01 });
@@ -291,6 +292,7 @@ function rebuild() {
       maleView.position.y=-c.height*.62;
     }
     dimensionAnchor=maleView;dimensionState={width:c.width,height:c.height,thickness:c.thickness};
+    hingePreview=mechanism==="hinge"?femaleView:null;
     preview.add(maleView,femaleView);if(pin)preview.add(pin.clone());
     model={male:maleExport,female:femaleExport,pin:pinExport,material:bodyMaterial};
     $("#body-spec").textContent=c.width+" × "+c.height+" mm";$("#relief-spec").textContent=c.relief.toFixed(1)+" mm";$("#offset-spec").textContent=c.clearance.toFixed(2)+" mm";
@@ -364,9 +366,14 @@ document.querySelectorAll("input,select,textarea").forEach(input=>{
     if(input.id==="stamp-text")$("#text-count").textContent=`${input.value.length} / 40`;
     if(input.id==="pattern-repeat")$("#repeat-value").textContent=input.value;
     if(input.id==="magnet-count")$("#magnet-count-value").textContent=input.value;
+    if(input.id==="hinge-angle"){
+      $("#hinge-angle-value").textContent=input.value+"°";
+      if(hingePreview)hingePreview.rotation.x=Math.PI-Number(input.value)*Math.PI/180;
+      return;
+    }
     if(input.type!=="range")scheduleRebuild();
   });
-  input.addEventListener("change",scheduleRebuild);
+  input.addEventListener("change",()=>{if(input.id!=="hinge-angle")scheduleRebuild();});
 });
 document.querySelectorAll(".view-button").forEach(button=>button.addEventListener("click",()=>{
   viewMode=button.dataset.view;
@@ -393,7 +400,7 @@ function simplifyShape(shape,segments=64){
 }
 function parseSvgShapes(text){
   if(text.length>350000)throw new Error("This SVG is too large for a responsive preview (350 KB maximum). Simplify or export a smaller SVG.");
-  const pathCount=(text.match(/<path\\b/gi)||[]).length,commandCount=(text.match(/[MmLlHhVvCcSsQqTtAaZz]/g)||[]).length;
+  const pathCount=(text.match(/<path\b/gi)||[]).length,commandCount=(text.match(/[MmLlHhVvCcSsQqTtAaZz]/g)||[]).length;
   if(pathCount>80||commandCount>18000)throw new Error("This SVG has too many vector segments. Simplify it in a vector editor and try again.");
   const svg=new SVGLoader().parse(text),raw=svg.paths.flatMap(path=>SVGLoader.createShapes(path));
   if(raw.length>40)throw new Error("This SVG has more than 40 filled regions. Combine or simplify its paths and retry.");
@@ -416,7 +423,7 @@ $("#svg-file").addEventListener("change",async event=>{
 });
 function projectData(){
   return {version:1,name:$("#project-name").value,mechanism,designMode,svgName:sourceSvgName,svgText:sourceSvgText,
-    values:Object.fromEntries(["stamp-text","stamp-font","font-size","design-scale","design-rotation","offset-x","offset-y","mirror-design","plate-width","plate-height","plate-thickness","corner-radius","relief-height","impression-depth","clearance","design-margin","magnet-size","magnet-depth","magnet-count","pattern-select","pattern-repeat","material-preset"].map(id=>[id,$("#"+id).type==="checkbox"?$("#"+id).checked:$("#"+id).value]))};
+    values:Object.fromEntries(["stamp-text","stamp-font","font-size","design-scale","design-rotation","offset-x","offset-y","mirror-design","plate-width","plate-height","plate-thickness","corner-radius","relief-height","impression-depth","clearance","design-margin","magnet-size","magnet-depth","magnet-count","hinge-angle","pattern-select","pattern-repeat","material-preset"].map(id=>[id,$("#"+id).type==="checkbox"?$("#"+id).checked:$("#"+id).value]))};
 }
 function applyProject(data){
   if(data.version!==1||!data.values)throw new Error("Unsupported project file.");
@@ -432,6 +439,7 @@ function applyProject(data){
   $("#text-count").textContent=`${$("#stamp-text").value.length} / 40`;
   $("#repeat-value").textContent=$("#pattern-repeat").value;
   $("#magnet-count-value").textContent=$("#magnet-count").value;
+  $("#hinge-angle-value").textContent=$("#hinge-angle").value+"°";
   scheduleRebuild();
 }
 $("#save-project").addEventListener("click",()=>{
@@ -446,9 +454,9 @@ $("#load-project").addEventListener("change",async event=>{
 });
 $("#reset-design").addEventListener("click",()=>{
   if(!confirm("Reset all stamp settings to the starter design?"))return;
-  const defaults={"stamp-text":"MAKE IT","stamp-font":"helvetiker_bold","font-size":"20","design-scale":".82","design-rotation":"0","offset-x":"0","offset-y":"0","plate-width":"64","plate-height":"42","plate-thickness":"5","corner-radius":"4","relief-height":".8","impression-depth":".9","clearance":".22","design-margin":"4","magnet-size":"6","magnet-depth":"2","magnet-count":"2","pattern-select":"dots","pattern-repeat":"5","material-preset":"pla"};
+  const defaults={"stamp-text":"MAKE IT","stamp-font":"helvetiker_bold","font-size":"20","design-scale":".82","design-rotation":"0","offset-x":"0","offset-y":"0","plate-width":"64","plate-height":"42","plate-thickness":"5","corner-radius":"4","relief-height":".8","impression-depth":".9","clearance":".22","design-margin":"4","magnet-size":"6","magnet-depth":"2","magnet-count":"2","hinge-angle":"145","pattern-select":"dots","pattern-repeat":"5","material-preset":"pla"};
   for(const [id,value]of Object.entries(defaults))$("#"+id).value=value;
-  $("#mirror-design").checked=true;mechanism="hinge";designMode="text";sourceSvgShapes=null;sourceSvgName="";sourceSvgText="";
+  $("#mirror-design").checked=true;$("#hinge-angle-value").textContent="145°";mechanism="hinge";designMode="text";sourceSvgShapes=null;sourceSvgName="";sourceSvgText="";
   document.querySelectorAll(".mechanism").forEach(x=>x.classList.toggle("active",x.dataset.mechanism==="hinge"));
   document.querySelectorAll(".mode-button").forEach(x=>x.classList.toggle("active",x.dataset.mode==="text"));
   document.querySelectorAll(".design-pane").forEach(x=>x.classList.toggle("active",x.dataset.design==="text"));
