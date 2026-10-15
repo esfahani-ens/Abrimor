@@ -73,14 +73,14 @@ const materialColors = { pla: "#e0a165", petg: "#78a18b", resin: "#8393ad" };
 function num(id, fallback) { const el=$(id); return el ? (Number(el.value) || fallback) : fallback; }
 function config() {
   return {
-    width: clamp(num("#plate-width",64),25,120),
-    height: clamp(num("#plate-height",42),20,100),
+    width: clamp(num("#plate-width",64.29),25,120),
+    height: clamp(num("#plate-height",45),20,100),
     thickness: clamp(num("#plate-thickness",5),2,15),
     corner: clamp(num("#corner-radius",4),0,15),
-    relief: clamp(num("#relief-height",.8),.2,4),
+    relief: clamp(num("#relief-height",.4),.2,4),
     depth: clamp(num("#impression-depth",.9),.2,Math.min(4,Math.max(.2,num("#plate-thickness",5)-.2))),
     clearance: clamp(num("#clearance",.22),.05,1),
-    margin: clamp(num("#design-margin",4),1,12),
+    margin: clamp(num("#design-margin",2.5),1,12),
     scale: clamp(num("#design-scale",.82),.3,1.2),
     edgeCap: clamp(num("#edge-cap",0),0,.8),
     rotation: num("#design-rotation",0) * Math.PI / 180,
@@ -496,7 +496,7 @@ $("#load-project").addEventListener("change",async event=>{
 });
 $("#reset-design").addEventListener("click",()=>{
   if(!confirm("Reset all stamp settings to the starter design?"))return;
-  const defaults={"stamp-text":"MAKE IT","stamp-font":"helvetiker_bold","font-size":"20","design-scale":".82","design-rotation":"0","edge-cap":"0","offset-x":"0","offset-y":"0","plate-width":"64","plate-height":"42","plate-thickness":"5","corner-radius":"4","relief-height":".8","impression-depth":".9","clearance":".22","design-margin":"4","hinge-hole":"1.75","magnet-size":"6","magnet-depth":"2","magnet-count":"2","hinge-angle":"145","pattern-select":"dots","pattern-repeat":"5","material-preset":"pla"};
+  const defaults={"stamp-text":"MAKE IT","stamp-font":"helvetiker_bold","font-size":"20","design-scale":".82","design-rotation":"0","edge-cap":"0","offset-x":"0","offset-y":"0","plate-width":"64.29","plate-height":"45","plate-thickness":"5","corner-radius":"4","relief-height":".4","impression-depth":".9","clearance":".22","design-margin":"2.5","hinge-hole":"1.75","magnet-size":"6","magnet-depth":"2","magnet-count":"2","hinge-angle":"145","pattern-select":"dots","pattern-repeat":"5","material-preset":"pla"};
   for(const [id,value]of Object.entries(defaults)){const el=$("#"+id);if(el)el.value=value;}
   const rotationRange=$("#design-rotation-range"),rotationOutput=$("#rotation-angle-value");
   if(rotationRange)rotationRange.value="0";if(rotationOutput)rotationOutput.textContent="0°";
