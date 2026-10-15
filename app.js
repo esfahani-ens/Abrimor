@@ -289,9 +289,11 @@ function rebuild() {
   busy=true;notice.textContent="Building both stamp faces…";
   exportMale.disabled=exportFemale.disabled=exportFull.disabled=true;
   try{
-    const c=config(),evaluator=new Evaluator();evaluator.useGroups=false;
+    const c=config();
+    const maleEvaluator=new Evaluator(),femaleEvaluator=new Evaluator();
+    maleEvaluator.useGroups=false;femaleEvaluator.useGroups=false;
     bodyMaterial.color.set(viewMode==="white"?"#eeeeeb":(materialColors[$("#material-preset").value]||materialColors.pla));
-    const malePart=makePart(c,"male",evaluator,bodyMaterial),femalePart=makePart(c,"female",evaluator,bodyMaterial);
+    const malePart=makePart(c,"male",maleEvaluator,bodyMaterial),femalePart=makePart(c,"female",femaleEvaluator,bodyMaterial);
     const d=hingeOffset(c),pin=mechanism==="hinge"?makePin(c):null;
     const maleExport=new THREE.Group();maleExport.add(malePart);
     const femaleExport=new THREE.Group(),femaleExportPart=femalePart.clone(true);
@@ -349,7 +351,7 @@ animate();
 function loadSelectedFont(){
   const fontName=$("#stamp-font").value;
   exportMale.disabled=exportFemale.disabled=true;
-  new FontLoader().load(`./vendor/fonts/${fontName}.typeface.json`,loaded=>{
+  new FontLoader().load(`https://cdn.jsdelivr.net/npm/three@0.180.0/examples/fonts/${fontName}.typeface.json`,loaded=>{
   font=loaded;loadedFontName=fontName;
   rebuild();
   loading.classList.add("hidden");
