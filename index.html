@@ -50,7 +50,7 @@
             <div class="loading-state" id="loading-state"><span class="loader"></span><span>Preparing the 3D workshop…</span></div>
             <div class="preview-hint">DRAG TO ROTATE <span>·</span> SCROLL TO ZOOM</div>
             <div class="model-label"><span class="model-label-dot"></span><span id="model-label">HINGE · TEXT STAMP</span></div>
-            <div class="dimension-overlay" id="dimension-overlay" hidden><span id="dimension-width">64 mm</span><span id="dimension-height">42 mm</span></div>
+            <div class="dimension-overlay" id="dimension-overlay" hidden><svg id="dimension-lines"><line id="width-line"></line><line id="height-line"></line></svg><span id="dimension-width">64 mm</span><span id="dimension-height">42 mm</span></div>
             <div class="axis-label">MM <span>↗</span></div>
           </div>
           <div class="preview-footer">
@@ -89,6 +89,7 @@
               <button type="button" class="mechanism active" data-mechanism="hinge"><span>⌁</span><strong>Hinge</strong><small>Integrated pivot</small></button>
               <button type="button" class="mechanism" data-mechanism="magnet"><span>⊕</span><strong>Magnet</strong><small>Neodymium pockets</small></button>
             </div>
+            <div class="hinge-only"><label class="range-field"><span>HINGE OPENING <output id="hinge-angle-value">145°</output></span><input id="hinge-angle" type="range" min="0" max="180" value="145"></label></div>
             <div class="field-row magnet-only" hidden>
               <label class="field" for="magnet-size"><span>MAGNET DIAMETER</span><span class="select-wrap"><select id="magnet-size"><option value="5">5 mm</option><option value="6" selected>6 mm</option><option value="8">8 mm</option></select></span></label>
               <label class="field" for="magnet-depth"><span>POCKET DEPTH</span><span class="unit-input"><input id="magnet-depth" type="number" min="1" max="4" step="0.1" value="2"><em>mm</em></span></label>

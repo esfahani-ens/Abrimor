@@ -4,7 +4,7 @@ import { FontLoader } from "three/addons/loaders/FontLoader.js";
 import { TextGeometry } from "three/addons/geometries/TextGeometry.js";
 import { SVGLoader } from "three/addons/loaders/SVGLoader.js";
 import { STLExporter } from "three/addons/exporters/STLExporter.js";
-import { Brush, Evaluator, SUBTRACTION } from "three-bvh-csg";
+import { ADDITION, Brush, Evaluator, SUBTRACTION } from "three-bvh-csg";
 
 const $ = (selector) => document.querySelector(selector);
 const stage = $("#preview-stage");
@@ -60,7 +60,11 @@ let mechanism = "hinge";
 let designMode = "text";
 let viewMode = "simple";
 let busy = false;
+let rebuildQueued = false;
 let debounceTimer;
+let dimensionAnchor = null;
+let dimensionState = null;
+let dimensionsVisible = false;
 let history = [];
 let bodyMaterial = new THREE.MeshStandardMaterial({ color: "#e0a165", roughness: .52, metalness: .01 });
 const materialColors = { pla: "#e0a165", petg: "#78a18b", resin: "#8393ad" };
@@ -84,6 +88,7 @@ function config() {
     magnet: num("#magnet-size",6),
     magnetDepth: clamp(num("#magnet-depth",2),1,4),
     magnetCount: Number($("#magnet-count").value),
+    angle: Number($("#hinge-angle").value || 145) * Math.PI / 180,
     repetitions: Number($("#pattern-repeat").value)
   };
 }
@@ -112,35 +117,28 @@ function makeRingGeometry(outerRadius,innerRadius,length) {
   g.rotateY(Math.PI/2);
   return g;
 }
+function hingeOffset(c){return c.height/2+2.7*.65;}
 function makeHinge(c,part) {
-  const group=new THREE.Group();
-  const radius=2.7;
-  const hole=Math.max(.65,1.15+c.clearance/4);
-  const y=c.height/2+radius*.65;
-  const z=c.thickness/2;
+  const group=new THREE.Group(),radius=2.7,hole=Math.max(.65,1.15+c.clearance/4);
+  const y=hingeOffset(c),z=c.thickness/2,gap=Math.max(.45,c.clearance*2);
   if(part==="male"){
     for(const x of [-c.width*.28,c.width*.28]){
-      const length=Math.max(6,c.width*.22);
+      const length=Math.max(4,c.width*.22-gap);
       const ring=new THREE.Mesh(makeRingGeometry(radius,hole,length),bodyMaterial);
-      ring.position.set(x-length/2,y,z);
-      ring.castShadow=true; group.add(ring);
+      ring.position.set(x-length/2,y,z);ring.castShadow=true;group.add(ring);
     }
   }else{
-    const length=Math.max(8,c.width*.34);
+    const length=Math.max(5,c.width*.34-gap);
     const ring=new THREE.Mesh(makeRingGeometry(radius,hole,length),bodyMaterial);
-    ring.position.set(-length/2,y,z);
-    ring.castShadow=true; group.add(ring);
+    ring.position.set(-length/2,y,z);ring.castShadow=true;group.add(ring);
   }
   return group;
 }
 function makePin(c){
-  const length=c.width*.82;
-  const g=new THREE.CylinderGeometry(0.9,0.9,length,24,1,false);
+  const length=c.width*.82,g=new THREE.CylinderGeometry(.9,.9,length,24,1,false);
   g.rotateZ(Math.PI/2);
   const mesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:"#555650",roughness:.4}));
-  mesh.position.set(0,c.height/2+2.1,c.thickness/2);
-  mesh.castShadow=true;
-  return mesh;
+  mesh.position.set(0,0,c.thickness/2);mesh.castShadow=true;return mesh;
 }
 function makeMagnetCutters(c) {
   const cutters=[];
@@ -194,7 +192,7 @@ function designGeometry(c,depth,expanded=0) {
   }else{
     const shapes=designMode==="upload"?(sourceSvgShapes||[]):buildPatternShapes(c);
     if(!shapes.length) throw new Error("Upload an SVG with filled paths before creating the mold.");
-    geometry=new THREE.ExtrudeGeometry(shapes,{depth,bevelEnabled:false,curveSegments:12});
+    geometry=new THREE.ExtrudeGeometry(shapes,{depth,bevelEnabled:false,curveSegments:4});
   }
   geometry.computeBoundingBox();
   const bounds=geometry.boundingBox;
@@ -233,12 +231,12 @@ function disposeGroup(group){
   group.traverse(o=>{if(o.geometry)o.geometry.dispose();});
   while(group.children.length)group.remove(group.children[0]);
 }
-function subtract(plate,cutter,evaluator){
+function booleanOp(plate,cutter,evaluator,operation){
   plate.updateMatrixWorld(true);cutter.updateMatrixWorld(true);
-  const result=evaluator.evaluate(plate,cutter,SUBTRACTION);
-  result.geometry.computeVertexNormals();
-  return result;
+  const result=evaluator.evaluate(plate,cutter,operation);
+  result.geometry.computeVertexNormals();return result;
 }
+function subtract(plate,cutter,evaluator){return booleanOp(plate,cutter,evaluator,SUBTRACTION);}
 function addMagnetPockets(plate,c,evaluator){
   if(mechanism!=="magnet")return plate;
   for(const cutter of makeMagnetCutters(c)){
@@ -248,65 +246,79 @@ function addMagnetPockets(plate,c,evaluator){
 }
 function makePart(c,part,evaluator,material){
   if(designMode==="upload"&&!sourceSvgShapes)throw new Error("Choose an SVG with filled paths before building the stamp.");
-  let plate=new Brush(plateGeometry(c),material);
-  plate.position.z=0;
-  plate.updateMatrixWorld(true);
-  const cutDepth=part==="female"?c.depth:c.relief;
-  if(designMode==="text"&&$("#stamp-text").value.trim()===""){
-    // An empty text field is intentionally allowed; the plates remain plain.
-  }else if(designMode!=="upload"||sourceSvgShapes){
-    const baseZ=part==="female"?c.thickness-cutDepth: c.thickness;
-    const cutter=makeDesignBrush(c,cutDepth,baseZ,part==="female"?c.clearance:0);
-    plate=subtract(plate,cutter,evaluator);
+  let plate=new Brush(plateGeometry(c),material);plate.position.z=0;plate.updateMatrixWorld(true);
+  const hasDesign=!(designMode==="text"&&!$("#stamp-text").value.trim());
+  if(hasDesign){
+    const depth=part==="female"?c.depth:c.relief;
+    const baseZ=part==="female"?c.thickness-depth:c.thickness-.025;
+    const cutter=makeDesignBrush(c,depth,baseZ,part==="female"?c.clearance:0);
+    plate=booleanOp(plate,cutter,evaluator,part==="female"?SUBTRACTION:ADDITION);
   }
   plate=addMagnetPockets(plate,c,evaluator);
-  const mesh=new THREE.Mesh(plate.geometry,material);
-  mesh.castShadow=true;mesh.receiveShadow=true;
+  const mesh=new THREE.Mesh(plate.geometry,material);mesh.castShadow=true;mesh.receiveShadow=true;
   const partGroup=new THREE.Group();partGroup.add(mesh);
   if(mechanism==="hinge")partGroup.add(makeHinge(c,part));
   return partGroup;
 }
 function rebuild() {
   if(!font||busy)return;
-  busy=true; notice.textContent="Building both stamp halves…";
+  busy=true;notice.textContent="Building raised and recessed stamp faces…";
   exportMale.disabled=exportFemale.disabled=true;exportPin.disabled=true;
   try{
-    const c=config();
-    const evaluator=new Evaluator();
-    evaluator.useGroups=false;
-    const plaColor=viewMode==="white"?"#eeeeeb":(materialColors[$("#material-preset").value]||materialColors.pla);
-    bodyMaterial.color.set(plaColor);
-    const male=makePart(c,"male",evaluator,bodyMaterial);
-    const female=makePart(c,"female",evaluator,bodyMaterial);
-    const pin=mechanism==="hinge"?makePin(c):null;
-
+    const c=config(),evaluator=new Evaluator();evaluator.useGroups=false;
+    bodyMaterial.color.set(viewMode==="white"?"#eeeeeb":(materialColors[$("#material-preset").value]||materialColors.pla));
+    const malePart=makePart(c,"male",evaluator,bodyMaterial),femalePart=makePart(c,"female",evaluator,bodyMaterial);
+    const d=hingeOffset(c),pin=mechanism==="hinge"?makePin(c):null;
+    const maleExport=new THREE.Group();maleExport.add(malePart);
+    const femaleExport=new THREE.Group(),femaleExportPart=femalePart.clone(true);
+    if(mechanism==="hinge"){
+      maleExport.position.y=-d;
+      femaleExportPart.position.set(0,d,c.thickness);femaleExportPart.rotation.x=Math.PI;
+    }else{
+      femaleExportPart.position.z=c.thickness;femaleExportPart.rotation.x=Math.PI;
+    }
+    femaleExport.add(femaleExportPart);
+    const pinExport=pin?new THREE.Group():null;if(pin)pinExport.add(pin);
     disposeGroup(preview);
-    const maleView=new THREE.Group();maleView.add(male);maleView.position.x=-c.width*.58;
-    const femaleView=new THREE.Group();femaleView.add(female);femaleView.position.x=c.width*.58;
-    preview.add(maleView,femaleView);
-    if(pin){const pinView=pin.clone();pinView.position.x=0;preview.add(pinView);}
-    model={male,female,pin,material:bodyMaterial};
-    $("#body-spec").textContent=`${c.width} × ${c.height} mm`;
-    $("#relief-spec").textContent=`${c.relief.toFixed(1)} mm`;
-    $("#offset-spec").textContent=`${c.clearance.toFixed(2)} mm`;
-    $("#dimension-width").textContent=`${c.width} mm`;
-    $("#dimension-height").textContent=`${c.height} mm`;
+    const maleView=maleExport;
+    const femaleView=new THREE.Group();
+    if(mechanism==="hinge"){
+      femaleView.position.z=c.thickness/2;
+      const part=femalePart.clone(true);part.position.set(0,d,c.thickness/2);part.rotation.x=Math.PI;femaleView.add(part);
+      femaleView.rotation.x=Math.PI-c.angle;
+    }else{
+      femaleView.position.set(0,c.height*.62,c.thickness);const part=femalePart.clone(true);part.rotation.x=Math.PI;femaleView.add(part);
+      maleView.position.y=-c.height*.62;
+    }
+    dimensionAnchor=maleView;dimensionState={width:c.width,height:c.height,thickness:c.thickness};
+    preview.add(maleView,femaleView);if(pin)preview.add(pin.clone());
+    model={male:maleExport,female:femaleExport,pin:pinExport,material:bodyMaterial};
+    $("#body-spec").textContent=c.width+" × "+c.height+" mm";$("#relief-spec").textContent=c.relief.toFixed(1)+" mm";$("#offset-spec").textContent=c.clearance.toFixed(2)+" mm";
+    $("#dimension-width").textContent=c.width+" mm";$("#dimension-height").textContent=c.height+" mm";
     const designName=designMode==="text"?"TEXT":designMode==="upload"?"SVG LOGO":$("#pattern-select").value.toUpperCase();
-    $("#model-label").textContent=`${mechanism.toUpperCase()} · ${designName}`;
-    exportMale.disabled=exportFemale.disabled=false;
-    exportPin.hidden=mechanism!=="hinge";exportPin.disabled=mechanism!=="hinge";
-    notice.textContent="";
-  }catch(error){
-    console.error(error);
-    notice.textContent=error.message||"Could not build this model. Check the design and dimensions.";
-  }finally{busy=false;}
+    $("#model-label").textContent=mechanism.toUpperCase()+" · "+designName;
+    exportMale.disabled=exportFemale.disabled=false;exportPin.hidden=mechanism!=="hinge";exportPin.disabled=mechanism!=="hinge";notice.textContent="";
+  }catch(error){console.error(error);notice.textContent=error.message||"Could not build this model. Check the design and dimensions.";
+  }finally{busy=false;if(rebuildQueued){rebuildQueued=false;scheduleRebuild();}}
 }
 
 function scheduleRebuild(){
-  clearTimeout(debounceTimer);
-  debounceTimer=setTimeout(rebuild,160);
+  clearTimeout(debounceTimer);debounceTimer=setTimeout(()=>{if(busy)rebuildQueued=true;else requestAnimationFrame(rebuild);},500);
 }
-function animate(){requestAnimationFrame(animate);controls.update();renderer.render(scene,camera);}
+function screenPoint(x,y,z){const p=new THREE.Vector3(x,y,z).applyMatrix4(dimensionAnchor.matrixWorld).project(camera);return {x:(p.x+1)*stage.clientWidth/2,y:(1-p.y)*stage.clientHeight/2,visible:p.z>=-1&&p.z<=1};}
+function updateDimensionOverlay(){
+  if(!dimensionsVisible||!dimensionAnchor||!dimensionState)return;
+  dimensionAnchor.updateMatrixWorld(true);camera.updateMatrixWorld();
+  const d=dimensionState,z=d.thickness+.3,gap=5;
+  const a=screenPoint(-d.width/2,-d.height/2-gap,z),b=screenPoint(d.width/2,-d.height/2-gap,z);
+  const c=screenPoint(-d.width/2-gap,-d.height/2,z),e=screenPoint(-d.width/2-gap,d.height/2,z);
+  const lines=[[$("#width-line"),a,b],[$("#height-line"),c,e]];
+  for(const [line,p,q] of lines){line.setAttribute("x1",p.x);line.setAttribute("y1",p.y);line.setAttribute("x2",q.x);line.setAttribute("y2",q.y);line.style.display=p.visible&&q.visible?"":"none";}
+  const widthLabel=$("#dimension-width"),heightLabel=$("#dimension-height");
+  widthLabel.style.left=((a.x+b.x)/2)+"px";widthLabel.style.top=((a.y+b.y)/2)+"px";
+  heightLabel.style.left=((c.x+e.x)/2)+"px";heightLabel.style.top=((c.y+e.y)/2)+"px";
+}
+function animate(){requestAnimationFrame(animate);controls.update();updateDimensionOverlay();renderer.render(scene,camera);}
 animate();
 function loadSelectedFont(){
   const fontName=$("#stamp-font").value;
@@ -352,7 +364,7 @@ document.querySelectorAll("input,select,textarea").forEach(input=>{
     if(input.id==="stamp-text")$("#text-count").textContent=`${input.value.length} / 40`;
     if(input.id==="pattern-repeat")$("#repeat-value").textContent=input.value;
     if(input.id==="magnet-count")$("#magnet-count-value").textContent=input.value;
-    scheduleRebuild();
+    if(input.type!=="range")scheduleRebuild();
   });
   input.addEventListener("change",scheduleRebuild);
 });
@@ -365,23 +377,38 @@ document.querySelectorAll(".view-button").forEach(button=>button.addEventListene
   bodyMaterial.color.set(viewMode==="white"?"#eeeeeb":materialColors[$("#material-preset").value]);
 }));
 $("#dimensions-toggle").addEventListener("click",()=>{
-  const button=$("#dimensions-toggle"),show=button.getAttribute("aria-pressed")!=="true";
-  button.setAttribute("aria-pressed",String(show));$("#dimension-overlay").hidden=!show;
+  const button=$("#dimensions-toggle");dimensionsVisible=button.getAttribute("aria-pressed")!=="true";
+  button.setAttribute("aria-pressed",String(dimensionsVisible));$("#dimension-overlay").hidden=!dimensionsVisible;
 });
 $("#reset-view").addEventListener("click",()=>{
   camera.position.set(110,-150,130);controls.target.set(0,0,4);controls.update();
 });
+function simplifyShape(shape,segments=64){
+  const points=shape.getSpacedPoints(segments);if(points.length<3)return null;
+  const result=new THREE.Shape();result.moveTo(points[0].x,points[0].y);
+  for(let i=1;i<points.length;i++)result.lineTo(points[i].x,points[i].y);result.closePath();
+  for(const hole of shape.holes){const hp=hole.getSpacedPoints(Math.max(24,Math.floor(segments/2)));if(hp.length<3)continue;
+    const path=new THREE.Path();path.moveTo(hp[0].x,hp[0].y);for(let i=1;i<hp.length;i++)path.lineTo(hp[i].x,hp[i].y);path.closePath();result.holes.push(path);}
+  return result;
+}
+function parseSvgShapes(text){
+  if(text.length>350000)throw new Error("This SVG is too large for a responsive preview (350 KB maximum). Simplify or export a smaller SVG.");
+  const pathCount=(text.match(/<path\\b/gi)||[]).length,commandCount=(text.match(/[MmLlHhVvCcSsQqTtAaZz]/g)||[]).length;
+  if(pathCount>80||commandCount>18000)throw new Error("This SVG has too many vector segments. Simplify it in a vector editor and try again.");
+  const svg=new SVGLoader().parse(text),raw=svg.paths.flatMap(path=>SVGLoader.createShapes(path));
+  if(raw.length>40)throw new Error("This SVG has more than 40 filled regions. Combine or simplify its paths and retry.");
+  const shapes=raw.map(shape=>simplifyShape(shape)).filter(Boolean);
+  if(!shapes.length)throw new Error("No filled SVG paths found. Convert strokes to filled paths and retry.");
+  return shapes;
+}
 $("#svg-file").addEventListener("change",async event=>{
   const file=event.target.files?.[0];if(!file)return;
   try{
-    const text=await file.text();
-    if(!text.includes("<svg"))throw new Error("That file does not contain an SVG image.");
-    const svg=new SVGLoader().parse(text);
-    sourceSvgText=text;
-    sourceSvgShapes=svg.paths.flatMap(path=>SVGLoader.createShapes(path));
-    if(!sourceSvgShapes.length)throw new Error("No filled SVG paths found. Convert strokes to filled paths and retry.");
-    sourceSvgName=file.name;$("#file-status").textContent=`${file.name} · ${sourceSvgShapes.length} filled path(s)`;
-    designMode="upload";
+    if(file.size>350000)throw new Error("This SVG is too large for a responsive preview (350 KB maximum).");
+    notice.textContent="Reading and simplifying SVG paths…";const text=await file.text();
+    if(!text.toLowerCase().includes("<svg"))throw new Error("That file does not contain an SVG image.");
+    const shapes=parseSvgShapes(text);sourceSvgText=text;sourceSvgShapes=shapes;sourceSvgName=file.name;
+    $("#file-status").textContent=file.name+" · "+shapes.length+" simplified filled path(s)";designMode="upload";
     document.querySelectorAll(".mode-button").forEach(x=>x.classList.toggle("active",x.dataset.mode==="upload"));
     document.querySelectorAll(".design-pane").forEach(x=>x.classList.toggle("active",x.dataset.design==="upload"));
     scheduleRebuild();
@@ -395,7 +422,7 @@ function applyProject(data){
   if(data.version!==1||!data.values)throw new Error("Unsupported project file.");
   $("#project-name").value=data.name||"My custom stamp";mechanism=data.mechanism||"hinge";designMode=data.designMode||"text";
   sourceSvgText=data.svgText||"";sourceSvgName=data.svgName||"";
-  sourceSvgShapes=sourceSvgText?new SVGLoader().parse(sourceSvgText).paths.flatMap(path=>SVGLoader.createShapes(path)):null;
+  sourceSvgShapes=sourceSvgText?parseSvgShapes(sourceSvgText):null;
   for(const [id,value] of Object.entries(data.values)){const el=$("#"+id);if(el){if(el.type==="checkbox")el.checked=Boolean(value);else el.value=value;}}
   if($("#stamp-font").value!==loadedFontName)loadSelectedFont();
   document.querySelectorAll(".mechanism").forEach(x=>x.classList.toggle("active",x.dataset.mechanism===mechanism));
