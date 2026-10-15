@@ -208,7 +208,14 @@ function designGeometry(c,depth,expanded=0,part="male") {
 }
 function mirrorY(geometry){
   const g=geometry.toNonIndexed(),p=g.getAttribute("position");
-  for(let i=0;i<p.count;i+=3){const y1=p.getY(i+1),y2=p.getY(i+2);p.setY(i,-p.getY(i));p.setY(i+1,-y2);p.setY(i+2,-y1);}
+  for(let i=0;i<p.count;i+=3){
+    p.setY(i,-p.getY(i));p.setY(i+1,-p.getY(i+1));p.setY(i+2,-p.getY(i+2));
+    for(const name of Object.keys(g.attributes)){
+      const a=g.getAttribute(name),values=[];
+      for(let k=0;k<a.itemSize;k++)values.push(a.array[(i+1)*a.itemSize+k]);
+      for(let k=0;k<a.itemSize;k++){a.array[(i+1)*a.itemSize+k]=a.array[(i+2)*a.itemSize+k];a.array[(i+2)*a.itemSize+k]=values[k];}
+    }
+  }
   g.computeVertexNormals();g.computeBoundingBox();g.computeBoundingSphere();return g;
 }
 function mirrorX(geometry){
@@ -359,6 +366,7 @@ document.querySelectorAll(".mechanism").forEach(button=>button.addEventListener(
   mechanism=button.dataset.mechanism;
   document.querySelectorAll(".mechanism").forEach(x=>x.classList.toggle("active",x===button));
   document.querySelectorAll(".magnet-only").forEach(x=>x.hidden=mechanism!=="magnet");
+  document.querySelectorAll(".hinge-only").forEach(x=>x.hidden=mechanism!=="hinge");
   scheduleRebuild();
 }));
 document.querySelectorAll(".mode-button").forEach(button=>button.addEventListener("click",()=>{
