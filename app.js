@@ -390,7 +390,7 @@ $("#dimensions-toggle").addEventListener("click",()=>{
 $("#reset-view").addEventListener("click",()=>{
   camera.position.set(110,-150,130);controls.target.set(0,0,4);controls.update();
 });
-function simplifyShape(shape,segments=64){
+function simplifyShape(shape,segments=48){
   const points=shape.getSpacedPoints(segments);if(points.length<3)return null;
   const result=new THREE.Shape();result.moveTo(points[0].x,points[0].y);
   for(let i=1;i<points.length;i++)result.lineTo(points[i].x,points[i].y);result.closePath();
@@ -399,11 +399,11 @@ function simplifyShape(shape,segments=64){
   return result;
 }
 function parseSvgShapes(text){
-  if(text.length>350000)throw new Error("This SVG is too large for a responsive preview (350 KB maximum). Simplify or export a smaller SVG.");
+  if(text.length>250000)throw new Error("This SVG is too large for a responsive preview (250 KB maximum). Simplify or export a smaller SVG.");
   const pathCount=(text.match(/<path\b/gi)||[]).length,commandCount=(text.match(/[MmLlHhVvCcSsQqTtAaZz]/g)||[]).length;
-  if(pathCount>80||commandCount>18000)throw new Error("This SVG has too many vector segments. Simplify it in a vector editor and try again.");
+  if(pathCount>50||commandCount>12000)throw new Error("This SVG has too many vector segments. Simplify it in a vector editor and try again.");
   const svg=new SVGLoader().parse(text),raw=svg.paths.flatMap(path=>SVGLoader.createShapes(path));
-  if(raw.length>40)throw new Error("This SVG has more than 40 filled regions. Combine or simplify its paths and retry.");
+  if(raw.length>24)throw new Error("This SVG has more than 24 filled regions. Combine or simplify its paths and retry.");
   const shapes=raw.map(shape=>simplifyShape(shape)).filter(Boolean);
   if(!shapes.length)throw new Error("No filled SVG paths found. Convert strokes to filled paths and retry.");
   return shapes;
@@ -411,7 +411,7 @@ function parseSvgShapes(text){
 $("#svg-file").addEventListener("change",async event=>{
   const file=event.target.files?.[0];if(!file)return;
   try{
-    if(file.size>350000)throw new Error("This SVG is too large for a responsive preview (350 KB maximum).");
+    if(file.size>250000)throw new Error("This SVG is too large for a responsive preview (250 KB maximum).");
     notice.textContent="Reading and simplifying SVG paths…";const text=await file.text();
     if(!text.toLowerCase().includes("<svg"))throw new Error("That file does not contain an SVG image.");
     const shapes=parseSvgShapes(text);sourceSvgText=text;sourceSvgShapes=shapes;sourceSvgName=file.name;

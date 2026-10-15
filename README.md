@@ -28,6 +28,6 @@ Then open `http://localhost:8000` in a modern browser. Three.js, its fonts, and 
 
 The female cavity uses proportional design scaling as a fit allowance. It is not a true per-edge CAD offset. Hinge and magnet dimensions are a design preview, not manufacturing-qualified hardware; inspect clearances, wall thickness, magnet polarity, and test prints before production.
 
-SVG files are simplified before mesh generation. For a responsive browser preview, uploads are limited to 350 KB, 80 path elements, and 40 filled regions. Convert strokes to filled paths and simplify complex artwork in a vector editor. Raster/PNG tracing, curved text, a curated icon library, and 3MF export are not included yet.
+SVG files are simplified before mesh generation. For a responsive browser preview, uploads are limited to 250 KB, 50 path elements, and 24 filled regions. Convert strokes to filled paths and simplify complex artwork in a vector editor. Raster/PNG tracing, curved text, a curated icon library, and 3MF export are not included yet.
 
 This browser edition is an early implementation and has not been validated in a slicer. Check each downloaded model before printing.
