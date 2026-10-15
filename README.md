@@ -1,21 +1,30 @@
 # Abrimor
 
-Abrimor is an online 3D stamp creator for the Abriform.
+Abrimor is a browser based 3D stamp and mold designer.
 
-## Stamp Studio
+## Stamp & Mold Studio
 
-The browser based MVP lives in `index.html`, `styles.css`, and `app.js`. It provides a live 3D preview, editable impression text, adjustable stamp dimensions, body color choices, orbit controls, and binary STL export.
+The free browser edition supports:
 
-### Run locally
+- Hinged or magnet-coupled stamp layouts.
+- Text, filled SVG logos, and repeat patterns (dots, waves, stripes, diamonds).
+- Separate male and female stamp bodies with editable dimensions, corner radius, relief, impression depth, fit offset, design scale, rotation, and X/Y placement.
+- Live 3D preview with simple, technical, and white inspection views.
+- Separate binary STL exports for the male and female parts, plus a hinge pin.
+- Local project save, JSON download, and JSON project import.
 
-Serve the repository root with any static web server and open its URL in a modern browser. For example:
+## Run locally
+
+Serve the repository root with any static web server, for example:
 
 ```sh
 python -m http.server 8000
 ```
 
-Then visit `http://localhost:8000`. The app loads Three.js modules and its display font from jsDelivr at runtime, so an internet connection is required.
+Then open `http://localhost:8000` in a modern browser. The app loads Three.js, its font, and the boolean geometry module from CDNs, so first use requires an internet connection.
 
-### Current scope
+## Engineering note
 
-This first browser edition creates a flat stamp body with raised, mirrored lettering. It exports the geometry as STL; it does not upload designs or send them to a printer. Check the exported model in your slicer before printing.
+The model is intended as a starting point for personal stamp design and should be inspected in a slicer and test printed before production. Printer tolerances, material behavior, hinge fit, magnet polarity, and actual stamp pressure vary. The fit offset is an approximate proportional cavity expansion; it is not a validated per-edge CAD offset. The magnet mechanism makes pocket pairs in both halves; use matching magnets and verify polarity before assembly.
+
+This edition is client-side. It does not require an account, charge for exports, upload designs, or include paid tiers. SVG import currently expects filled paths. 3MF export, raster/PNG tracing, curved text, and a curated icon library are not included yet.

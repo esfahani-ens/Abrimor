@@ -4,97 +4,188 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f4f2ed">
-  <meta name="description" content="Design a custom 3D stamp and export it as an STL file with Abrimor.">
-  <title>Abrimor — 3D Stamp Studio</title>
+  <meta name="description" content="Design a custom hinged or magnetic 3D stamp and export its male and female parts as STL files.">
+  <title>Abrimor — Stamp & Mold Studio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css">
   <script type="importmap">
-    {
-      "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
-      }
-    }
+    {"imports":{
+      "three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+      "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
+      "three-bvh-csg":"https://esm.sh/three-bvh-csg@0.0.17?external=three"
+    }}
   </script>
   <script type="module" src="./app.js"></script>
 </head>
 <body>
   <header class="topbar">
     <a class="brand" href="#" aria-label="Abrimor home"><span class="brand-mark">A</span><span>abrimor<span class="brand-dot">.</span></span></a>
-    <div class="topbar-note"><span class="status-dot"></span> STAMP STUDIO <span class="topbar-divider">/</span> BROWSER EDITION</div>
-    <a class="topbar-link" href="https://github.com/esfahani-ens/Abrimor" target="_blank" rel="noreferrer">ABOUT THE PROJECT <span aria-hidden="true">↗</span></a>
+    <div class="topbar-note"><span class="status-dot"></span> STAMP &amp; MOLD STUDIO <span class="topbar-divider">/</span> FREE BROWSER EDITION</div>
+    <span class="private-note">NO ACCOUNT · NO PAYWALL</span>
   </header>
-
   <main>
     <section class="intro">
-      <div class="eyebrow"><span>01</span> YOUR IDEA, IN THREE DIMENSIONS</div>
-      <h1>Make your mark<span class="headline-period">.</span></h1>
-      <p class="intro-copy">A little stamp with a lot to say. Shape your design, turn it around, and take the model with you.</p>
+      <div class="eyebrow"><span>ABRIMOR / 01</span> FROM YOUR DESIGN TO A REAL IMPRESSION</div>
+      <h1>Make a mark<span class="headline-period">.</span></h1>
+      <p class="intro-copy">Build a custom embossing stamp in your browser. Shape both halves, tune the fit, and export the parts for your 3D printer.</p>
     </section>
 
-    <section class="studio" aria-label="Stamp design studio">
-      <div class="preview-panel">
-        <div class="panel-heading">
-          <div><span class="panel-kicker">THE OBJECT</span><h2>Live preview</h2></div>
-          <div class="view-badge"><span class="view-dot"></span> 3D VIEW</div>
+    <section class="workspace" aria-label="Stamp and mold designer">
+      <div class="preview-column">
+        <div class="preview-panel">
+          <div class="panel-heading">
+            <div><span class="panel-kicker">LIVE MODEL</span><h2>Your stamp, from every angle</h2></div>
+            <div class="preview-tools">
+              <div class="view-switch" role="group" aria-label="Preview mode">
+                <button type="button" class="view-button active" data-view="simple">Simple</button>
+                <button type="button" class="view-button" data-view="technical">Technical</button>
+                <button type="button" class="view-button" data-view="white">White</button>
+              </div>
+              <button type="button" class="icon-button" id="dimensions-toggle" aria-pressed="false" title="Show dimensions">↔ <span>Dimensions</span></button>
+            </div>
+          </div>
+          <div class="preview-stage" id="preview-stage">
+            <div class="loading-state" id="loading-state"><span class="loader"></span><span>Preparing the 3D workshop…</span></div>
+            <div class="preview-hint">DRAG TO ROTATE <span>·</span> SCROLL TO ZOOM</div>
+            <div class="model-label"><span class="model-label-dot"></span><span id="model-label">HINGE · TEXT STAMP</span></div>
+            <div class="dimension-overlay" id="dimension-overlay" hidden><span id="dimension-width">64 mm</span><span id="dimension-height">42 mm</span></div>
+            <div class="axis-label">MM <span>↗</span></div>
+          </div>
+          <div class="preview-footer">
+            <div class="spec-item"><span class="spec-label">PLATE</span><span id="body-spec">64 × 42 mm</span></div>
+            <div class="spec-item"><span class="spec-label">RELIEF</span><span id="relief-spec">0.8 mm</span></div>
+            <div class="spec-item"><span class="spec-label">CLEARANCE</span><span id="offset-spec">0.22 mm</span></div>
+            <button class="reset-view" id="reset-view" type="button">↺ RESET VIEW</button>
+          </div>
         </div>
-        <div class="preview-stage" id="preview-stage">
-          <div class="loading-state" id="loading-state"><span class="loader"></span><span>Preparing your studio…</span></div>
-          <div class="preview-hint"><span class="mouse-icon">↔</span> DRAG TO ROTATE <span class="hint-dot">·</span> SCROLL TO ZOOM</div>
-          <div class="model-label"><span class="model-label-dot"></span><span id="model-label">CUSTOM STAMP</span></div>
-          <div class="axis-label">MM <span>↗</span></div>
+
+        <div class="export-panel">
+          <div class="export-copy"><span class="panel-kicker">READY WHEN YOU ARE</span><h2>Your files, no account needed.</h2><p>Export the male and female pieces separately. Hinge designs also include a pin.</p></div>
+          <div class="export-actions">
+            <button class="export-button" id="export-male" type="button" disabled><span>↓</span> Male STL</button>
+            <button class="export-button secondary" id="export-female" type="button" disabled><span>↓</span> Female STL</button>
+            <button class="export-button pin-export" id="export-pin" type="button" disabled hidden><span>↓</span> Hinge pin</button>
+          </div>
+          <div class="notice" id="notice" role="status" aria-live="polite"></div>
         </div>
-        <div class="preview-footer">
-          <div class="spec-item"><span class="spec-label">BODY</span><span id="body-spec">76 × 48 mm</span></div>
-          <div class="spec-item"><span class="spec-label">RELIEF</span><span>2.0 mm</span></div>
-          <div class="spec-item"><span class="spec-label">FILE TYPE</span><span>.STL</span></div>
-          <button class="reset-view" id="reset-view" type="button" aria-label="Reset camera view">↺ <span>RESET VIEW</span></button>
-        </div>
+
+        <div class="privacy-card"><span>✳</span><div><strong>Your design stays on this device.</strong><small>Nothing is uploaded. Save a project file to keep working later.</small></div></div>
       </div>
 
       <aside class="controls-panel">
-        <div class="controls-heading"><span class="panel-kicker">THE DETAILS</span><span class="step-count">02 <span>/</span> 02</span></div>
-        <h2>Build your stamp</h2>
-        <p class="controls-copy">Every change updates the model instantly.</p>
-
-        <label class="field-label" for="stamp-text">YOUR IMPRESSION <span>01</span></label>
-        <div class="input-wrap">
-          <input id="stamp-text" type="text" value="MAKE IT" maxlength="16" autocomplete="off" aria-describedby="text-help">
-          <span class="input-count" id="text-count">7 / 16</span>
+        <div class="controls-header"><div><span class="panel-kicker">DESIGN WORKSPACE</span><h2>Build your stamp</h2></div><button class="text-button" id="reset-design" type="button">Reset</button></div>
+        <div class="tabs" role="tablist">
+          <button class="tab active" role="tab" aria-selected="true" data-tab="design">Design</button>
+          <button class="tab" role="tab" aria-selected="false" data-tab="geometry">Geometry</button>
+          <button class="tab" role="tab" aria-selected="false" data-tab="project">Project</button>
         </div>
-        <p class="field-help" id="text-help">Keep it short for a crisp, clear impression.</p>
 
-        <div class="field-label dimension-label">STAMP SIZE <span>02</span></div>
-        <div class="dimension-grid">
-          <label class="dimension-field"><span>WIDTH</span><span class="number-wrap"><input id="stamp-width" type="number" min="40" max="100" value="76"><em>mm</em></span></label>
-          <label class="dimension-field"><span>HEIGHT</span><span class="number-wrap"><input id="stamp-height" type="number" min="30" max="80" value="48"><em>mm</em></span></label>
-        </div>
-        <label class="field-label material-label" for="stamp-color">BODY COLOR <span>03</span></label>
-        <div class="color-row">
-          <div class="color-swatches" role="group" aria-label="Choose stamp body color">
-            <button class="swatch active" type="button" data-color="#e5a45f" aria-label="Amber" style="--swatch:#e5a45f"></button>
-            <button class="swatch" type="button" data-color="#5e877a" aria-label="Sage" style="--swatch:#5e877a"></button>
-            <button class="swatch" type="button" data-color="#687a9e" aria-label="Blue" style="--swatch:#687a9e"></button>
-            <button class="swatch" type="button" data-color="#c97868" aria-label="Coral" style="--swatch:#c97868"></button>
-            <button class="swatch" type="button" data-color="#4c4a47" aria-label="Charcoal" style="--swatch:#4c4a47"></button>
+        <div class="tab-content active" data-panel="design">
+          <div class="control-section">
+            <div class="section-title"><span>01</span><h3>Stamp mechanism</h3></div>
+            <div class="segmented" role="group" aria-label="Stamp mechanism">
+              <button type="button" class="mechanism active" data-mechanism="hinge"><span>⌁</span><strong>Hinge</strong><small>Integrated pivot</small></button>
+              <button type="button" class="mechanism" data-mechanism="magnet"><span>⊕</span><strong>Magnet</strong><small>Neodymium pockets</small></button>
+            </div>
+            <div class="field-row magnet-only" hidden>
+              <label class="field" for="magnet-size"><span>MAGNET DIAMETER</span><span class="select-wrap"><select id="magnet-size"><option value="5">5 mm</option><option value="6" selected>6 mm</option><option value="8">8 mm</option></select></span></label>
+              <label class="field" for="magnet-depth"><span>POCKET DEPTH</span><span class="unit-input"><input id="magnet-depth" type="number" min="1" max="4" step="0.1" value="2"><em>mm</em></span></label>
+            </div>
           </div>
-          <span class="color-name" id="color-name">AMBER</span>
+
+          <div class="control-section">
+            <div class="section-title"><span>02</span><h3>Impression design</h3></div>
+            <div class="design-modes" role="group" aria-label="Design source">
+              <button class="mode-button active" data-mode="text" type="button">Text</button>
+              <button class="mode-button" data-mode="upload" type="button">SVG logo</button>
+              <button class="mode-button" data-mode="pattern" type="button">Pattern</button>
+            </div>
+            <div class="design-pane active" data-design="text">
+              <label class="field" for="stamp-text"><span>YOUR TEXT <small id="text-count">7 / 40</small></span><textarea id="stamp-text" maxlength="40" rows="2">MAKE IT</textarea></label>
+              <div class="field-row">
+                <label class="field" for="stamp-font"><span>LETTER STYLE</span><span class="select-wrap"><select id="stamp-font"><option value="helvetiker_bold">Bold Sans</option><option value="gentilis_bold">Serif Bold</option><option value="optimer_bold">Technical</option></select></span></label>
+                <label class="field" for="font-size"><span>TEXT SIZE</span><span class="unit-input"><input id="font-size" type="number" min="8" max="32" step="1" value="20"><em>mm</em></span></label>
+              </div>
+            </div>
+            <div class="design-pane" data-design="upload">
+              <label class="upload-zone" for="svg-file"><span class="upload-icon">↑</span><strong>Choose an SVG logo</strong><small>Filled vector paths work best. File is read locally.</small><input id="svg-file" type="file" accept=".svg,image/svg+xml"></label>
+              <div class="file-status" id="file-status">No logo loaded</div>
+            </div>
+            <div class="design-pane" data-design="pattern">
+              <label class="field" for="pattern-select"><span>REPEAT PATTERN</span><span class="select-wrap"><select id="pattern-select"><option value="dots">Dots</option><option value="waves">Waves</option><option value="stripes">Diagonal stripes</option><option value="diamonds">Diamonds</option></select></span></label>
+              <label class="range-field"><span>REPETITIONS <output id="repeat-value">5</output></span><input id="pattern-repeat" type="range" min="2" max="12" value="5"></label>
+            </div>
+            <div class="field-row design-adjustments">
+              <label class="field" for="design-scale"><span>DESIGN SCALE</span><span class="unit-input"><input id="design-scale" type="number" min="0.3" max="1.2" step="0.05" value="0.82"><em>×</em></span></label>
+              <label class="field" for="design-rotation"><span>ROTATION</span><span class="unit-input"><input id="design-rotation" type="number" min="0" max="359" step="1" value="0"><em>°</em></span></label>
+            </div>
+            <div class="field-row">
+              <label class="field" for="offset-x"><span>OFFSET X</span><span class="unit-input"><input id="offset-x" type="number" min="-30" max="30" step="0.1" value="0"><em>mm</em></span></label>
+              <label class="field" for="offset-y"><span>OFFSET Y</span><span class="unit-input"><input id="offset-y" type="number" min="-30" max="30" step="0.1" value="0"><em>mm</em></span></label>
+            </div>
+            <label class="check-row"><input id="mirror-design" type="checkbox" checked><span class="checkmark"></span><span><strong>Mirror impression</strong><small>Reverses the design on the stamp face.</small></span></label>
+          </div>
         </div>
 
-        <div class="rule"></div>
-        <button class="export-button" id="export-stl" type="button" disabled>
-          <span class="export-icon">↓</span><span class="export-text">Export 3D model <small>Download print-ready STL</small></span><span class="export-arrow">↗</span>
-        </button>
-        <p class="privacy-note"><span>✳</span> Your design stays in your browser.</p>
-        <div class="notice" id="notice" role="status" aria-live="polite"></div>
+        <div class="tab-content" data-panel="geometry" hidden>
+          <div class="control-section">
+            <div class="section-title"><span>03</span><h3>Plate dimensions</h3></div>
+            <div class="field-row">
+              <label class="field" for="plate-width"><span>WIDTH</span><span class="unit-input"><input id="plate-width" type="number" min="25" max="120" step="0.1" value="64"><em>mm</em></span></label>
+              <label class="field" for="plate-height"><span>HEIGHT</span><span class="unit-input"><input id="plate-height" type="number" min="20" max="100" step="0.1" value="42"><em>mm</em></span></label>
+            </div>
+            <div class="field-row">
+              <label class="field" for="plate-thickness"><span>PLATE THICKNESS</span><span class="unit-input"><input id="plate-thickness" type="number" min="2" max="15" step="0.1" value="5"><em>mm</em></span></label>
+              <label class="field" for="corner-radius"><span>CORNER RADIUS</span><span class="unit-input"><input id="corner-radius" type="number" min="0" max="15" step="0.5" value="4"><em>mm</em></span></label>
+            </div>
+          </div>
+          <div class="control-section">
+            <div class="section-title"><span>04</span><h3>Impression &amp; fit</h3></div>
+            <div class="field-row">
+              <label class="field" for="relief-height"><span>RELIEF HEIGHT</span><span class="unit-input"><input id="relief-height" type="number" min="0.2" max="4" step="0.1" value="0.8"><em>mm</em></span></label>
+              <label class="field" for="impression-depth"><span>FEMALE DEPTH</span><span class="unit-input"><input id="impression-depth" type="number" min="0.2" max="4" step="0.1" value="0.9"><em>mm</em></span></label>
+            </div>
+            <div class="field-row">
+              <label class="field" for="clearance"><span>FIT OFFSET</span><span class="unit-input"><input id="clearance" type="number" min="0.05" max="1" step="0.01" value="0.22"><em>mm</em></span></label>
+              <label class="field" for="design-margin"><span>EDGE MARGIN</span><span class="unit-input"><input id="design-margin" type="number" min="1" max="12" step="0.5" value="4"><em>mm</em></span></label>
+            </div>
+            <p class="hint">Fit offset expands the female cavity around the design. Test-fit on your printer and material before a full production run.</p>
+          </div>
+          <div class="control-section magnet-only" hidden>
+            <div class="section-title"><span>05</span><h3>Magnet positions</h3></div>
+            <label class="range-field"><span>POCKET PAIRS <output id="magnet-count-value">2</output></span><input id="magnet-count" type="range" min="1" max="4" value="2"></label>
+          </div>
+          <div class="control-section">
+            <div class="section-title"><span>06</span><h3>Material preview</h3></div>
+            <label class="field" for="material-preset"><span>PRINT MATERIAL</span><span class="select-wrap"><select id="material-preset"><option value="pla">PLA · rigid</option><option value="petg">PETG · flexible</option><option value="resin">Resin · fine detail</option></select></span></label>
+            <p class="hint">Material changes the preview color only; slicer settings are up to your printer and material.</p>
+          </div>
+        </div>
+
+        <div class="tab-content" data-panel="project" hidden>
+          <div class="control-section">
+            <div class="section-title"><span>07</span><h3>Save your work</h3></div>
+            <label class="field" for="project-name"><span>PROJECT NAME</span><input class="text-input" id="project-name" type="text" value="My custom stamp" maxlength="60"></label>
+            <button class="wide-button" id="save-project" type="button">Save project on this device</button>
+            <button class="wide-button light-button" id="download-project" type="button">Download project file (.json)</button>
+            <label class="wide-button light-button file-button" for="load-project">Open project file (.json)<input id="load-project" type="file" accept=".json,application/json"></label>
+            <p class="hint">The browser keeps one saved project locally. Download a project file to make a separate backup.</p>
+          </div>
+          <div class="control-section">
+            <div class="section-title"><span>08</span><h3>Export options</h3></div>
+            <p class="hint">STL files use millimeters. The hinge pin is exported separately. Multicolor 3MF export is not included in this browser edition.</p>
+          </div>
+        </div>
+
+        <div class="controls-bottom">
+          <button class="text-button" id="undo-button" type="button">↶ Undo</button>
+          <span id="save-status">Changes update the preview automatically.</span>
+        </div>
       </aside>
     </section>
-
-    <footer class="page-footer">
-      <span>MADE FOR MAKING</span><span class="footer-center">ABRIMOR STAMP STUDIO <span>©</span> 2026</span><span>DESIGNED TO LEAVE A MARK</span>
-    </footer>
+    <footer class="page-footer"><span>ABRIMOR STAMP &amp; MOLD STUDIO</span><span class="footer-center">DESIGN LOCALLY · MAKE IT YOURS</span><span>STL EXPORT · NO ACCOUNT</span></footer>
   </main>
 </body>
 </html>
