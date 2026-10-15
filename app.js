@@ -54,6 +54,7 @@ let font = null;
 let sourceSvgShapes = null;
 let sourceSvgName = "";
 let sourceSvgText = "";
+let loadedFontName = "helvetiker_bold";
 let model = { male: null, female: null, pin: null, material: null };
 let mechanism = "hinge";
 let designMode = "text";
@@ -246,6 +247,7 @@ function addMagnetPockets(plate,c,evaluator){
   return plate;
 }
 function makePart(c,part,evaluator,material){
+  if(designMode==="upload"&&!sourceSvgShapes)throw new Error("Choose an SVG with filled paths before building the stamp.");
   let plate=new Brush(plateGeometry(c),material);
   plate.position.z=0;
   plate.updateMatrixWorld(true);
@@ -310,7 +312,7 @@ function loadSelectedFont(){
   const fontName=$("#stamp-font").value;
   exportMale.disabled=exportFemale.disabled=true;
   new FontLoader().load(`https://cdn.jsdelivr.net/npm/three@0.180.0/examples/fonts/${fontName}.typeface.json`,loaded=>{
-  font=loaded;
+  font=loaded;loadedFontName=fontName;
   rebuild();
   loading.classList.add("hidden");
 },undefined,()=>{
@@ -395,6 +397,7 @@ function applyProject(data){
   sourceSvgText=data.svgText||"";sourceSvgName=data.svgName||"";
   sourceSvgShapes=sourceSvgText?new SVGLoader().parse(sourceSvgText).paths.flatMap(path=>SVGLoader.createShapes(path)):null;
   for(const [id,value] of Object.entries(data.values)){const el=$("#"+id);if(el){if(el.type==="checkbox")el.checked=Boolean(value);else el.value=value;}}
+  if($("#stamp-font").value!==loadedFontName)loadSelectedFont();
   document.querySelectorAll(".mechanism").forEach(x=>x.classList.toggle("active",x.dataset.mechanism===mechanism));
   document.querySelectorAll(".magnet-only").forEach(x=>x.hidden=mechanism!=="magnet");
   document.querySelectorAll(".mode-button").forEach(x=>x.classList.toggle("active",x.dataset.mode===designMode));
@@ -416,7 +419,7 @@ $("#load-project").addEventListener("change",async event=>{
 });
 $("#reset-design").addEventListener("click",()=>{
   if(!confirm("Reset all stamp settings to the starter design?"))return;
-  const defaults={"stamp-text":"MAKE IT","font-size":"20","design-scale":".82","design-rotation":"0","offset-x":"0","offset-y":"0","plate-width":"64","plate-height":"42","plate-thickness":"5","corner-radius":"4","relief-height":".8","impression-depth":".9","clearance":".22","design-margin":"4","magnet-size":"6","magnet-depth":"2","magnet-count":"2","pattern-repeat":"5"};
+  const defaults={"stamp-text":"MAKE IT","stamp-font":"helvetiker_bold","font-size":"20","design-scale":".82","design-rotation":"0","offset-x":"0","offset-y":"0","plate-width":"64","plate-height":"42","plate-thickness":"5","corner-radius":"4","relief-height":".8","impression-depth":".9","clearance":".22","design-margin":"4","magnet-size":"6","magnet-depth":"2","magnet-count":"2","pattern-select":"dots","pattern-repeat":"5","material-preset":"pla"};
   for(const [id,value]of Object.entries(defaults))$("#"+id).value=value;
   $("#mirror-design").checked=true;mechanism="hinge";designMode="text";sourceSvgShapes=null;sourceSvgName="";sourceSvgText="";
   document.querySelectorAll(".mechanism").forEach(x=>x.classList.toggle("active",x.dataset.mechanism==="hinge"));
@@ -429,10 +432,11 @@ $("#undo-button").addEventListener("click",()=>{
   const old=history.pop();if(!old){$("#save-status").textContent="Nothing to undo yet.";return;}
   applyProject(old);$("#save-status").textContent="Last edit restored.";
 });
-document.querySelectorAll("input,select,textarea").forEach(el=>el.addEventListener("change",()=>{
-  if(history.length>20)history.shift();
-  history.push(JSON.parse(JSON.stringify(projectData())));
-},{capture:true}));
+let editSnapshot=null;
+document.addEventListener("focusin",()=>{editSnapshot=JSON.stringify(projectData());},true);
+document.addEventListener("change",()=>{
+  if(editSnapshot){if(history.length>=20)history.shift();history.push(JSON.parse(editSnapshot));editSnapshot=null;}
+},true);
 
 function slug(value){return value.toLowerCase().trim().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"abrimor-stamp";}
 function downloadText(text,name,type){const blob=new Blob([text],{type});downloadBlob(blob,name);}
