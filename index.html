@@ -50,12 +50,12 @@
             <div class="loading-state" id="loading-state"><span class="loader"></span><span>Preparing the 3D workshop…</span></div>
             <div class="preview-hint">DRAG TO ROTATE <span>·</span> SCROLL TO ZOOM</div>
             <div class="model-label"><span class="model-label-dot"></span><span id="model-label">HINGE · TEXT STAMP</span></div>
-            <div class="dimension-overlay" id="dimension-overlay" hidden><svg id="dimension-lines"><line id="width-line"></line><line id="height-line"></line></svg><span id="dimension-width">64 mm</span><span id="dimension-height">42 mm</span></div>
+            <div class="dimension-overlay" id="dimension-overlay" hidden><svg id="dimension-lines"><line id="width-line"></line><line id="height-line"></line></svg><span id="dimension-width">64.29 mm</span><span id="dimension-height">45 mm</span></div>
             <div class="axis-label">MM <span>↗</span></div>
           </div>
           <div class="preview-footer">
-            <div class="spec-item"><span class="spec-label">PLATE</span><span id="body-spec">64 × 42 mm</span></div>
-            <div class="spec-item"><span class="spec-label">RELIEF</span><span id="relief-spec">0.8 mm</span></div>
+            <div class="spec-item"><span class="spec-label">PLATE</span><span id="body-spec">64.29 × 45 mm</span></div>
+            <div class="spec-item"><span class="spec-label">RELIEF</span><span id="relief-spec">0.4 mm</span></div>
             <div class="spec-item"><span class="spec-label">CLEARANCE</span><span id="offset-spec">0.22 mm</span></div>
             <button class="reset-view" id="reset-view" type="button">↺ RESET VIEW</button>
           </div>
@@ -140,8 +140,8 @@
           <div class="control-section">
             <div class="section-title"><span>03</span><h3>Plate dimensions</h3></div>
             <div class="field-row">
-              <label class="field" for="plate-width"><span>WIDTH</span><span class="unit-input"><input id="plate-width" type="number" min="25" max="120" step="0.1" value="64"><em>mm</em></span></label>
-              <label class="field" for="plate-height"><span>HEIGHT</span><span class="unit-input"><input id="plate-height" type="number" min="20" max="100" step="0.1" value="42"><em>mm</em></span></label>
+              <label class="field" for="plate-width"><span>WIDTH</span><span class="unit-input"><input id="plate-width" type="number" min="25" max="120" step="0.01" value="64.29"><em>mm</em></span></label>
+              <label class="field" for="plate-height"><span>HEIGHT</span><span class="unit-input"><input id="plate-height" type="number" min="20" max="100" step="0.1" value="45"><em>mm</em></span></label>
             </div>
             <div class="field-row">
               <label class="field" for="plate-thickness"><span>PLATE THICKNESS</span><span class="unit-input"><input id="plate-thickness" type="number" min="2" max="15" step="0.1" value="5"><em>mm</em></span></label>
@@ -153,12 +153,12 @@
             <label class="field" for="edge-cap"><span>LETTER / SVG CHAMFER</span><span class="unit-input"><input id="edge-cap" type="number" min="0" max="0.8" step="0.05" value="0"><em>mm</em></span></label>
             <p class="hint">Cuts a straight 45° chamfer around the impression edges on both plates. Set to 0 for sharp edges.</p>
             <div class="field-row">
-              <label class="field" for="relief-height"><span>RELIEF HEIGHT</span><span class="unit-input"><input id="relief-height" type="number" min="0.2" max="4" step="0.1" value="0.8"><em>mm</em></span></label>
+              <label class="field" for="relief-height"><span>RELIEF HEIGHT</span><span class="unit-input"><input id="relief-height" type="number" min="0.2" max="4" step="0.1" value="0.4"><em>mm</em></span></label>
               <label class="field" for="impression-depth"><span>FEMALE DEPTH</span><span class="unit-input"><input id="impression-depth" type="number" min="0.2" max="4" step="0.1" value="0.9"><em>mm</em></span></label>
             </div>
             <div class="field-row">
               <label class="field" for="clearance"><span>FIT OFFSET</span><span class="unit-input"><input id="clearance" type="number" min="0.05" max="1" step="0.01" value="0.22"><em>mm</em></span></label>
-              <label class="field" for="design-margin"><span>EDGE MARGIN</span><span class="unit-input"><input id="design-margin" type="number" min="1" max="12" step="0.5" value="4"><em>mm</em></span></label>
+              <label class="field" for="design-margin"><span>EDGE MARGIN</span><span class="unit-input"><input id="design-margin" type="number" min="1" max="12" step="0.5" value="2.5"><em>mm</em></span></label>
             </div>
             <p class="hint">Fit offset expands the female cavity around the design. Test-fit on your printer and material before a full production run.</p>
           </div>
