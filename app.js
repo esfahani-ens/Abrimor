@@ -142,7 +142,7 @@ function addHingeRib(group,c,xCenter,length,side){
   const outerRadius=2.7,edge=side*c.height/2;
   const geometry=new THREE.BoxGeometry(length,outerRadius+1.2,2.6);
   const rib=new THREE.Mesh(geometry,bodyMaterial);
-  rib.position.set(xCenter,edge+side*(outerRadius/2),c.thickness-.65);
+  rib.position.set(xCenter,edge+side*(outerRadius/2),c.thickness-2.0);
   rib.castShadow=true;rib.receiveShadow=true;group.add(rib);
 }
 function makePin(c){
@@ -302,7 +302,7 @@ function rebuild() {
       femaleExportPart.position.z=c.thickness;femaleExportPart.rotation.x=Math.PI;
     }
     femaleExport.add(femaleExportPart);
-    const pinExport=pin?new THREE.Group():null;if(pin)pinExport.add(pin);
+    // The hinge pin is preview-only; both hinge halves include their own barrels.
     disposeGroup(preview);
     const maleView=maleExport;
     const femaleView=new THREE.Group();
@@ -349,7 +349,7 @@ animate();
 function loadSelectedFont(){
   const fontName=$("#stamp-font").value;
   exportMale.disabled=exportFemale.disabled=true;
-  new FontLoader().load(`https://cdn.jsdelivr.net/npm/three@0.180.0/examples/fonts/${fontName}.typeface.json`,loaded=>{
+  new FontLoader().load(`./vendor/fonts/${fontName}.typeface.json`,loaded=>{
   font=loaded;loadedFontName=fontName;
   rebuild();
   loading.classList.add("hidden");
