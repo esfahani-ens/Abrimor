@@ -533,6 +533,7 @@ function bakeWorldGeometry(group){
   });
   return baked;
 }
+
 function exportPart(group,name){
   if(!group)return;
   try{
